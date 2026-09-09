@@ -44,14 +44,6 @@
           <span class="icon">🔗</span>
           <span class="label">SilkFilter ACL</span>
         </button>
-        <button class="nav-item" data-tab="storage">
-          <span class="icon">🗄️</span>
-          <span class="label">Storage Vault</span>
-        </button>
-        <button class="nav-item" data-tab="settings">
-          <span class="icon">⚙️</span>
-          <span class="label">Settings</span>
-        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -76,7 +68,7 @@
           <button class="btn btn-secondary btn-sm" id="btn-refresh">
             <span class="icon">🔄</span> Refresh
           </button>
-          <a href="https://github.com/amglogicalis/sphexn-repo-public" target="_blank" class="repo-link">
+          <a href="https://github.com/amglogicalis/phryx-repo-public" target="_blank" class="repo-link">
             <span>Public Repo</span>
           </a>
         </div>
@@ -221,6 +213,20 @@
                   </button>
                 </div>
               </form>
+
+              <!-- Configuration: Default Tunnel Timeout -->
+              <div class="card-footer-config mt-4" style="padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                  <div>
+                    <span class="label" style="font-weight: 600; color: var(--text-secondary); display: block; font-size: 0.85rem;">⚙️ Default Tunnel Timeout (min)</span>
+                    <span class="help-text" style="font-size: 0.75rem; color: var(--text-muted);">Fallback duration applied to newly generated tunnels</span>
+                  </div>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="number" id="set-tun-timeout" class="form-control" value="30" min="5" max="360" style="width: 85px; text-align: center;" />
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-save-tun-default">Save Default</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -371,6 +377,20 @@
                   <div class="copy-bar">
                     <input type="text" id="cert-ssh-cmd" readonly class="form-control code-font" />
                     <button class="btn btn-secondary btn-sm" onclick="copySnippet('cert-ssh-cmd', true)">Copy</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Configuration: Default SSH Cert Lifetime -->
+              <div class="card-footer-config mt-4" style="padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                  <div>
+                    <span class="label" style="font-weight: 600; color: var(--text-secondary); display: block; font-size: 0.85rem;">⚙️ Default SSH Cert Lifetime (min)</span>
+                    <span class="help-text" style="font-size: 0.75rem; color: var(--text-muted);">Fallback lifetime minted for zero-trust ephemeral certificates</span>
+                  </div>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input type="number" id="set-ssh-duration" class="form-control" value="60" min="5" max="1440" style="width: 85px; text-align: center;" />
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-save-ssh-default">Save Default</button>
                   </div>
                 </div>
               </div>
@@ -591,86 +611,6 @@
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB: STORAGE VAULT -->
-      <section class="tab-pane" id="pane-storage">
-        <div class="page-intro">
-          <div>
-            <h2>Storage Vault — .phryx-storage Inspector</h2>
-            <p>Audit trail and persistent state synchronized across GitHub Releases and the Git Database API at $0 cost.</p>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3>Storage Repository State</h3>
-            <span class="badge" id="storage-type-badge">Local Fallback</span>
-          </div>
-          <div class="card-body">
-            <div class="info-row">
-              <span class="label">Vault Target:</span>
-              <code class="code-pill" id="storage-target-path">.phryx_storage</code>
-            </div>
-            <div class="info-row">
-              <span class="label">Connection Status:</span>
-              <span class="text-success" id="storage-conn-status">Operational</span>
-            </div>
-
-            <h4 class="mt-4 mb-2">Vault Directory Tree</h4>
-            <div class="vault-tree" id="vault-tree-container">
-              <div class="tree-item">📁 tunnel-sessions/ (Active and historical tunnels)</div>
-              <div class="tree-item">📁 ssh/ (servers.json, CA keys, active sessions)</div>
-              <div class="tree-item">📁 reach/ (providers.json, rules.json, ACL audit history)</div>
-              <div class="tree-item">📁 geo/history/ (Multi-region probe matrices)</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB: SETTINGS -->
-      <section class="tab-pane" id="pane-settings">
-        <div class="page-intro">
-          <div>
-            <h2>Phryx Configuration & Secrets</h2>
-            <p>Customize token credentials, default timeouts, and storage parameters.</p>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3>System Settings</h3>
-          </div>
-          <div class="card-body">
-            <form id="settings-form" class="form-vertical">
-              <div class="form-group">
-                <label for="set-repo">Storage Repository (.phryx-storage)</label>
-                <input type="text" id="set-repo" class="form-control" value="amglogicalis/.phryx-storage" />
-              </div>
-
-              <div class="form-group">
-                <label for="set-token">GitHub Personal Access Token (PAT)</label>
-                <input type="password" id="set-token" class="form-control" placeholder="ghp_... or gho_..." />
-                <span class="help-text">Stored safely in your browser session for storage updates.</span>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label for="set-tun-timeout">Default Tunnel Timeout (min)</label>
-                  <input type="number" id="set-tun-timeout" class="form-control" value="30" />
-                </div>
-                <div class="form-group flex-1">
-                  <label for="set-ssh-duration">Default SSH Cert Lifetime (min)</label>
-                  <input type="number" id="set-ssh-duration" class="form-control" value="60" />
-                </div>
-              </div>
-
-              <div class="form-actions">
-                <button type="submit" class="btn btn-primary">💾 Save Settings</button>
-              </div>
-            </form>
           </div>
         </div>
       </section>

@@ -67,8 +67,6 @@ function switchTab(tabId) {
     caseshell: 'CaseShell (SSH CA)',
     geolarva: 'GeoLarva Multi-Region Prober',
     reach: 'PhryxReach & SilkFilter ACL',
-    storage: 'Storage Vault (.phryx-storage)',
-    settings: 'Settings & Secrets',
   };
 
   const titleEl = document.getElementById('current-tab-title');
@@ -459,6 +457,33 @@ function renderReach() {
 
 // ==================== Forms & Event Handlers ====================
 function initForms() {
+  // Initialize Default Configurations
+  const defaultTunTimeout = localStorage.getItem('phryx_default_tunnel_timeout') || '30';
+  const setTunTimeoutEl = document.getElementById('set-tun-timeout');
+  const tunTimeoutEl = document.getElementById('tun-timeout');
+  if (setTunTimeoutEl) setTunTimeoutEl.value = defaultTunTimeout;
+  if (tunTimeoutEl) tunTimeoutEl.value = defaultTunTimeout;
+
+  const defaultSshLifetime = localStorage.getItem('phryx_default_ssh_lifetime') || '60';
+  const setSshDurationEl = document.getElementById('set-ssh-duration');
+  const certDurationEl = document.getElementById('cert-duration');
+  if (setSshDurationEl) setSshDurationEl.value = defaultSshLifetime;
+  if (certDurationEl) certDurationEl.value = defaultSshLifetime;
+
+  document.getElementById('btn-save-tun-default')?.addEventListener('click', () => {
+    const val = document.getElementById('set-tun-timeout')?.value || '30';
+    localStorage.setItem('phryx_default_tunnel_timeout', val);
+    if (tunTimeoutEl) tunTimeoutEl.value = val;
+    alert(`✔ Default Tunnel Timeout updated to ${val} minutes.`);
+  });
+
+  document.getElementById('btn-save-ssh-default')?.addEventListener('click', () => {
+    const val = document.getElementById('set-ssh-duration')?.value || '60';
+    localStorage.setItem('phryx_default_ssh_lifetime', val);
+    if (certDurationEl) certDurationEl.value = val;
+    alert(`✔ Default SSH Cert Lifetime updated to ${val} minutes.`);
+  });
+
   // Tunnel Form
   document.getElementById('tunnel-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
