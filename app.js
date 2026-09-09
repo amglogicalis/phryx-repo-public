@@ -63,7 +63,7 @@ function switchTab(tabId) {
 
   const titles = {
     dashboard: 'Dashboard',
-    tunnel: 'PhryxTunnel (ngrok Killer)',
+    tunnel: 'PhryxTunnel',
     caseshell: 'CaseShell (SSH CA)',
     geolarva: 'GeoLarva Multi-Region Prober',
     reach: 'PhryxReach & SilkFilter ACL',

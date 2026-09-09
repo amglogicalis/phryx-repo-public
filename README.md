@@ -43,7 +43,7 @@ Los utiliza el tiempo estrictamente necesario y los autodestruye al terminar. **
 
 ## 🐚 Las 4 Especies Deterministas
 
-### 1. 🌐 PhryxTunnel — El *ngrok-killer* de Terra
+### 1. 🌐 PhryxTunnel — Localhost → URL Pública Efímera
 Expone cualquier servicio local (`localhost:3000`, `localhost:8080`) al mundo exterior mediante una URL pública efímera respaldada por runners de GitHub Actions y proxying Ballom (Feromask).
 - **Timeouts configurables:** desde 5 minutos hasta 6 horas.
 - **Autenticación opcional:** cabecera `X-Phryx-Token` para restringir el acceso a clientes autorizados.
