@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/terra-phryx"><img src="https://img.shields.io/badge/npm-terra--phryx-00d4ff.svg" alt="npm package" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-00f5d4.svg" alt="License" /></a>
-  <a href="https://github.com/amglogicalis/Terra"><img src="https://img.shields.io/badge/ecosystem-Terra%20%240-0077b6.svg" alt="Terra Ecosystem" /></a>
-  <a href="https://amglogicalis.github.io/phryx-repo-public/"><img src="https://img.shields.io/badge/console-PHRYX%20Silk%20Studio-06d6a0.svg" alt="Web Console" /></a>
+  <a href="https://www.npmjs.com/package/terra-phryx"><img src="https://img.shields.io/badge/npm-terra--phryx-803cff.svg" alt="npm package" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a87ffb.svg" alt="License" /></a>
+  <a href="https://github.com/amglogicalis/Terra"><img src="https://img.shields.io/badge/ecosystem-Terra%20%240-5e17eb.svg" alt="Terra Ecosystem" /></a>
+  <a href="https://amglogicalis.github.io/phryx-repo-public/"><img src="https://img.shields.io/badge/console-PHRYX%20Silk%20Studio-803cff.svg" alt="Web Console" /></a>
 </p>
 
 ---
