@@ -765,3 +765,194 @@ body {
   font-family: var(--font-mono);
   font-weight: 600;
 }
+
+/* ==================== Login Gate Overlay ==================== */
+.login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: radial-gradient(circle at 50% 35%, rgba(128, 60, 255, 0.25) 0%, #080312 75%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.login-card {
+  width: 460px;
+  max-width: 92vw;
+  padding: 38px 32px;
+  text-align: center;
+  border-radius: 18px;
+  background: rgba(14, 7, 30, 0.95);
+  border: 1px solid rgba(128, 60, 255, 0.45);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9), 0 0 35px rgba(128, 60, 255, 0.3);
+  backdrop-filter: blur(24px);
+  box-sizing: border-box;
+}
+
+.login-logo-box {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 16px auto;
+  border-radius: 16px;
+  background: rgba(128, 60, 255, 0.15);
+  border: 1px solid rgba(128, 60, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 25px rgba(128, 60, 255, 0.4);
+}
+
+.login-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(128, 60, 255, 0.85));
+}
+
+.login-info-box {
+  background: rgba(8, 3, 18, 0.85);
+  border: 1px solid rgba(128, 60, 255, 0.25);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 20px;
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.login-error {
+  color: #ef476f;
+  font-size: 0.82rem;
+  margin-top: 14px;
+  display: none;
+  background: rgba(239, 71, 111, 0.15);
+  border: 1px solid rgba(239, 71, 111, 0.35);
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+/* User Profile Topbar */
+.user-profile-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(18, 10, 36, 0.85);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  transition: border-color 0.2s;
+}
+
+.user-profile-topbar:hover {
+  border-color: var(--primary-brand);
+}
+
+.user-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--primary-brand);
+}
+
+.user-display-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.user-role-badge {
+  font-size: 0.68rem;
+  color: var(--secondary-aqua);
+}
+
+.btn-topbar-logout {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 20px;
+  background: rgba(239, 71, 111, 0.12);
+  border: 1px solid rgba(239, 71, 111, 0.35);
+  color: #ef476f;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-topbar-logout:hover {
+  background: rgba(239, 71, 111, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Local-Only Banner */
+.local-only-banner {
+  background: linear-gradient(135deg, rgba(128, 60, 255, 0.15) 0%, rgba(14, 7, 30, 0.9) 100%);
+  border: 1px solid rgba(128, 60, 255, 0.4);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.local-only-banner .banner-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+  padding: 10px;
+  background: rgba(128, 60, 255, 0.18);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.local-only-banner h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.local-only-banner p {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.local-only-banner .banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.local-only-banner code {
+  background: #080312;
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: #b58cff;
+}
+
+.badge-local-only {
+  background: rgba(128, 60, 255, 0.2);
+  border: 1px solid rgba(128, 60, 255, 0.5);
+  color: #b58cff;
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}

@@ -11,7 +11,45 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app-layout">
+  <!-- LOGIN GATE OVERLAY (Shown when unauthenticated) -->
+  <div id="login-gate" class="login-overlay">
+    <div class="login-card">
+      <div class="login-logo-box">
+        <img src="assets/logo_phryx.png" alt="Phryx Logo" class="login-logo" />
+      </div>
+
+      <h2 style="font-size: 1.45rem; font-weight: 800; color: #f5f0ff; margin-bottom: 6px; letter-spacing: -0.5px;">
+        PHRYX
+      </h2>
+      <p style="font-size: 0.82rem; color: #9f8fb9; margin-bottom: 18px; line-height: 1.4;">
+        Zero-Trust Ephemeral Mesh, Dynamic Cloud Perimeters & 60-min Ephemeral SSH CA
+      </p>
+
+      <div class="login-info-box">
+        Introduce tu <strong>GitHub Personal Access Token (PAT)</strong> con permisos <code>repo</code> y <code>workflow</code> para sincronizar con tu bóveda <code>.phryx-storage</code> y desbloquear la consola.
+      </div>
+
+      <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+        <label style="font-size: 0.78rem; font-weight: 600; color: #e2e8f0; display: block; margin-bottom: 6px;">GitHub Personal Access Token (PAT):</label>
+        <input type="password" id="token-input" class="form-control" style="width: 100%; padding: 11px 14px; background: #080312; border: 1px solid rgba(128, 60, 255, 0.4); border-radius: 8px; color: #fff; font-family: 'JetBrains Mono', monospace; font-size: 0.84rem; outline: none; box-sizing: border-box;" placeholder="ghp_..." autocomplete="off" />
+        <span style="font-size: 0.72rem; color: #675880; display: block; margin-top: 5px;">El token se almacena exclusivamente en la sesión local de tu navegador.</span>
+      </div>
+
+      <button id="btn-connect" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 0.92rem; font-weight: 700; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 18px rgba(128, 60, 255, 0.4);">
+        🔑 Conectar Bóveda y Desbloquear Consola
+      </button>
+
+      <div id="login-error" class="login-error"></div>
+
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; font-size: 0.74rem; color: #675880;">
+        <span class="pulse-dot" style="width: 7px; height: 7px;"></span>
+        <span>Terra Ecosystem • $0 Infrastructure • Zero Data Leak</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROTECTED MAIN CONSOLE (Shown ONLY when authenticated) -->
+  <div class="app-layout" id="app-layout" style="display: none;">
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
       <div class="brand">
@@ -68,9 +106,21 @@
           <button class="btn btn-secondary btn-sm" id="btn-refresh">
             <span class="icon">🔄</span> Refresh
           </button>
-          <a href="https://github.com/amglogicalis/phryx-repo-public" target="_blank" class="repo-link">
-            <span>Public Repo</span>
-          </a>
+
+          <!-- AUTHENTICATED USER PROFILE BADGE IN TOPBAR -->
+          <div class="user-profile-topbar" id="user-profile-topbar">
+            <img src="assets/logo_phryx.png" alt="Avatar" id="user-avatar" class="user-avatar" />
+            <div class="user-info" style="display: flex; flex-direction: column; line-height: 1.2;">
+              <span class="user-display-name" id="user-display">@user</span>
+              <span class="user-role-badge">Connected Vault</span>
+            </div>
+          </div>
+
+          <!-- LOGOUT BUTTON -->
+          <button class="btn-topbar-logout" id="btn-topbar-logout" title="Cerrar sesión de GitHub">
+            <span>🚪</span>
+            <span>Cerrar Sesión</span>
+          </button>
         </div>
       </header>
 
@@ -158,8 +208,26 @@
       <section class="tab-pane" id="pane-tunnel">
         <div class="page-intro">
           <div>
-            <h2>PhryxTunnel</h2>
+            <h2>PhryxTunnel <span class="badge-local-only">Local Exclusive</span></h2>
             <p>Instantly expose your local services to an ephemeral public URL via GitHub Actions runner relays.</p>
+          </div>
+        </div>
+
+        <!-- Local Host Binding Required Banner -->
+        <div class="local-only-banner" id="tunnel-local-banner">
+          <div class="banner-icon">💻</div>
+          <div class="banner-content">
+            <h4>Local Host Binding Required</h4>
+            <p>
+              Un túnel local requiere conectarse directamente al loopback (<code>localhost</code>) de tu máquina física. Por restricciones de seguridad del navegador, las páginas estáticas en la nube no pueden interceptar los puertos de tu hardware local.
+              Para activar el reenvío de tráfico en vivo, arranca la consola local con el CLI o lanza el túnel directamente en tu terminal:
+            </p>
+            <div class="banner-actions">
+              <code>phryx console</code>
+              <span style="font-size: 0.8rem; color: var(--text-muted);">o</span>
+              <code id="banner-cmd-example">phryx tunnel --port 3000</code>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('phryx tunnel --port 3000'); alert('Comando CLI copiado al portapapeles!')">📋 Copiar CLI</button>
+            </div>
           </div>
         </div>
 

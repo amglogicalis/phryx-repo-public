@@ -23,17 +23,176 @@ const state = {
     { code: 'australia-east', name: 'Australia East (Sydney)', location: 'Oceania', flag: '🇦🇺' },
     { code: 'south-africa', name: 'South Africa (Johannesburg)', location: 'Africa', flag: '🇿🇦' },
   ],
+  ghToken: null,
+  ghUser: null,
 };
 
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
+  initAuth();
   initNavigation();
   initForms();
-  loadAllData();
+  checkLocalMode();
 
   // Polling every 5 seconds for live status
   setInterval(refreshStatus, 5000);
 });
+
+// ─── GITHUB PAT AUTHENTICATION GATE ───────────────────────────────────────────
+function initAuth() {
+  const tokenInput = document.getElementById('token-input');
+  const btnConnect = document.getElementById('btn-connect');
+  const btnLogout = document.getElementById('btn-topbar-logout');
+
+  // Check existing session
+  const storedToken = sessionStorage.getItem('phryx_gh_token');
+  if (storedToken) {
+    authenticate(storedToken);
+  } else {
+    showLogin();
+  }
+
+  // Connect button click
+  btnConnect?.addEventListener('click', () => {
+    const token = tokenInput?.value.trim();
+    if (token) {
+      authenticate(token);
+    } else {
+      showAuthError('Por favor introduce un GitHub Personal Access Token (PAT) válido.');
+    }
+  });
+
+  // Enter key inside token input
+  tokenInput?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      const token = tokenInput.value.trim();
+      if (token) authenticate(token);
+    }
+  });
+
+  // Logout handler
+  btnLogout?.addEventListener('click', () => {
+    handleLogout();
+  });
+}
+
+function showLogin() {
+  const loginGate = document.getElementById('login-gate');
+  const appLayout = document.getElementById('app-layout');
+  const tokenInput = document.getElementById('token-input');
+  const loginError = document.getElementById('login-error');
+  const userProfile = document.getElementById('user-profile-topbar');
+  const btnLogout = document.getElementById('btn-topbar-logout');
+
+  if (loginGate) loginGate.style.display = 'flex';
+  if (appLayout) appLayout.style.display = 'none';
+  if (userProfile) userProfile.style.display = 'none';
+  if (btnLogout) btnLogout.style.display = 'none';
+  if (tokenInput) tokenInput.value = '';
+  if (loginError) loginError.style.display = 'none';
+}
+
+function showAuthError(msg) {
+  const errDiv = document.getElementById('login-error');
+  if (errDiv) {
+    errDiv.textContent = msg;
+    errDiv.style.display = 'block';
+  }
+}
+
+function handleLogout() {
+  sessionStorage.removeItem('phryx_gh_token');
+  sessionStorage.removeItem('phryx_gh_user');
+  state.ghToken = null;
+  state.ghUser = null;
+  showLogin();
+}
+window.handleLogout = handleLogout;
+
+async function authenticate(token) {
+  const btnConnect = document.getElementById('btn-connect');
+  const loginError = document.getElementById('login-error');
+  const loginGate = document.getElementById('login-gate');
+  const appLayout = document.getElementById('app-layout');
+  const userAvatar = document.getElementById('user-avatar');
+  const userDisplay = document.getElementById('user-display');
+  const userProfile = document.getElementById('user-profile-topbar');
+  const btnLogout = document.getElementById('btn-topbar-logout');
+
+  if (btnConnect) {
+    btnConnect.disabled = true;
+    btnConnect.textContent = 'Conectando a la Bóveda...';
+  }
+  if (loginError) loginError.style.display = 'none';
+
+  try {
+    const res = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.v3+json',
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Token inválido (HTTP ${res.status}). Comprueba que tenga permisos repo/workflow.`);
+    }
+
+    const userData = await res.json();
+
+    // Persist in session
+    sessionStorage.setItem('phryx_gh_token', token);
+    sessionStorage.setItem('phryx_gh_user', userData.login);
+    state.ghToken = token;
+    state.ghUser = userData.login;
+
+    // Update UI profile
+    if (userDisplay) userDisplay.textContent = `@${userData.login}`;
+    if (userAvatar) {
+      userAvatar.src = userData.avatar_url || 'assets/logo_phryx.png';
+      userAvatar.alt = userData.login;
+    }
+    if (userProfile) userProfile.style.display = 'flex';
+    if (btnLogout) btnLogout.style.display = 'inline-flex';
+
+    // Switch view
+    if (loginGate) loginGate.style.display = 'none';
+    if (appLayout) appLayout.style.display = 'flex';
+
+    // Load initial data
+    loadAllData();
+  } catch (err) {
+    showAuthError(err.message || 'Error autenticando con la API de GitHub.');
+    sessionStorage.removeItem('phryx_gh_token');
+  } finally {
+    if (btnConnect) {
+      btnConnect.disabled = false;
+      btnConnect.textContent = '🔑 Conectar Bóveda y Desbloquear Consola';
+    }
+  }
+}
+
+function checkLocalMode() {
+  const banner = document.getElementById('tunnel-local-banner');
+  const btnStart = document.getElementById('btn-start-tunnel');
+  if (state.isLocalServer) {
+    if (banner) {
+      banner.style.border = '1px solid var(--success)';
+      const icon = banner.querySelector('.banner-icon');
+      if (icon) icon.textContent = '⚡';
+      const h4 = banner.querySelector('h4');
+      if (h4) h4.textContent = 'Modo Local Activo (Daemon Conectado)';
+      const p = banner.querySelector('p');
+      if (p) p.textContent = 'La consola está conectada a tu backend local de Phryx. Puedes iniciar túneles reales hacia cualquier puerto local.';
+    }
+    if (btnStart) {
+      btnStart.innerHTML = '🚀 Iniciar Túnel Real';
+    }
+  } else {
+    if (btnStart) {
+      btnStart.innerHTML = '💻 Ejecutar en Local (Copiar CLI)';
+    }
+  }
+}
 
 // Navigation Handling
 function initNavigation() {
@@ -485,6 +644,12 @@ function initForms() {
   });
 
   // Tunnel Form
+  document.getElementById('tun-port')?.addEventListener('input', (e) => {
+    const val = e.target.value || '3000';
+    const exampleEl = document.getElementById('banner-cmd-example');
+    if (exampleEl) exampleEl.textContent = `phryx tunnel --port ${val}`;
+  });
+
   document.getElementById('tunnel-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const port = Number(document.getElementById('tun-port').value);
@@ -493,38 +658,34 @@ function initForms() {
     const subdomain = document.getElementById('tun-subdomain').value;
     const authToken = document.getElementById('tun-auth').value;
 
+    if (!state.isLocalServer) {
+      const authFlag = authToken ? ` --auth ${authToken}` : '';
+      const subFlag = subdomain ? ` --subdomain ${subdomain}` : '';
+      const cmd = `phryx tunnel --port ${port} --timeout ${timeoutMinutes}${authFlag}${subFlag}`;
+      copySnippetText(cmd);
+      alert(`⚠️ Función Exclusiva de Entorno Local:
+Los navegadores en la nube pública no pueden interceptar ni reenviar puertos de tu máquina física (localhost:${port}).
+
+Para iniciar este túnel en tu equipo:
+1) Ejecuta en tu terminal:
+   ${cmd}
+2) O arranca la consola local con:
+   phryx console
+
+¡El comando ha sido copiado automáticamente al portapapeles!`);
+      return;
+    }
+
     const payload = { port, protocol, timeoutMinutes, subdomain, authToken };
 
-    if (state.isLocalServer) {
-      const res = await fetch(`${state.apiBase}/api/tunnels`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const session = await res.json();
-        state.tunnels.unshift(session);
-      }
-    } else {
-      // Mock tunnel creation for online demo
-      const id = `phryx_tun_${Date.now()}`;
-      const sub = subdomain || `tun-${Math.random().toString(36).substring(2, 6)}`;
-      const session = {
-        id,
-        port,
-        protocol,
-        publicUrl: `https://${sub}.ballom.terra.mesh`,
-        localUrl: `http://127.0.0.1:${port}`,
-        startedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + timeoutMinutes * 60000).toISOString(),
-        status: 'active',
-        authTokenConfigured: Boolean(authToken),
-        totalRequests: 0,
-        recentLogs: [],
-        metrics: { totalBytes: 0, avgLatencyMs: 24, errorCount: 0 },
-      };
+    const res = await fetch(`${state.apiBase}/api/tunnels`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      const session = await res.json();
       state.tunnels.unshift(session);
-      localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
     }
 
     renderTunnels();
