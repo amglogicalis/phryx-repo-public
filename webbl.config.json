@@ -1,0 +1,6 @@
+{
+  "name": "phryx-silk-studio",
+  "entry": "index.html",
+  "cleanUrls": true,
+  "cacheTTL": 3600
+}

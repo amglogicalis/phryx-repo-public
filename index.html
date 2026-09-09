@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PHRYX Silk Studio — The Phantom Mesh</title>
+  <link rel="icon" type="image/png" href="assets/logo_phryx.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="assets/logo_phryx.png" alt="Phryx Logo" class="brand-logo" />
+        <div class="brand-text">
+          <span class="brand-title">PHRYX</span>
+          <span class="brand-subtitle">SILK STUDIO</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="icon">📊</span>
+          <span class="label">Dashboard</span>
+        </button>
+        <button class="nav-item" data-tab="tunnel">
+          <span class="icon">🌐</span>
+          <span class="label">PhryxTunnel</span>
+          <span class="badge" id="tunnel-active-badge">0</span>
+        </button>
+        <button class="nav-item" data-tab="caseshell">
+          <span class="icon">🐚</span>
+          <span class="label">CaseShell (SSH CA)</span>
+        </button>
+        <button class="nav-item" data-tab="geolarva">
+          <span class="icon">🌍</span>
+          <span class="label">GeoLarva Prober</span>
+        </button>
+        <button class="nav-item" data-tab="reach">
+          <span class="icon">🔗</span>
+          <span class="label">SilkFilter ACL</span>
+        </button>
+        <button class="nav-item" data-tab="storage">
+          <span class="icon">🗄️</span>
+          <span class="label">Storage Vault</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <span class="icon">⚙️</span>
+          <span class="label">Settings</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="status-indicator">
+          <span class="pulse-dot"></span>
+          <span class="status-text" id="engine-status">Mesh Online ($0)</span>
+        </div>
+        <div class="system-tag">Terra Ecosystem • v1.0.0</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Header Bar -->
+      <header class="top-header">
+        <div class="header-breadcrumb">
+          <span class="mesh-tag">PHANTOM MESH</span>
+          <span class="separator">/</span>
+          <span class="active-crumb" id="current-tab-title">Dashboard</span>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-refresh">
+            <span class="icon">🔄</span> Refresh
+          </button>
+          <a href="https://github.com/amglogicalis/sphexn-repo-public" target="_blank" class="repo-link">
+            <span>Public Repo</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- TAB: DASHBOARD -->
+      <section class="tab-pane active" id="pane-dashboard">
+        <div class="hero-banner">
+          <div class="hero-content">
+            <div class="hero-tag">ZERO-TRUST EPHEMERAL MESH</div>
+            <h2>The Phantom Mesh Control Center</h2>
+            <p>
+              Autonomous, zero-footprint tunneling, SilkFilter dynamic cloud perimeters, and 60-minute ephemeral SSH certificates powered by GitHub Actions runners at <strong>$0 infrastructure cost</strong>.
+            </p>
+          </div>
+          <div class="hero-stats">
+            <div class="stat-card">
+              <span class="stat-value" id="stat-active-tunnels">0</span>
+              <span class="stat-label">Active Tunnels</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-servers">0</span>
+              <span class="stat-label">Registered Servers</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-rules">0</span>
+              <span class="stat-label">Active ACL Rules</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-probes">0</span>
+              <span class="stat-label">Global Probes</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2-cols">
+          <!-- Active Tunnels Quick Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3><span class="icon">🌐</span> PhryxTunnel Live Leases</h3>
+              <button class="btn btn-primary btn-sm" onclick="switchTab('tunnel')">+ New Tunnel</button>
+            </div>
+            <div class="card-body">
+              <div id="dashboard-tunnels-list" class="tunnels-summary-list">
+                <div class="empty-state">No active tunnels. Launch one to expose your localhost to the world.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- CaseShell Quick Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3><span class="icon">🐚</span> CaseShell Zero-Trust SSH</h3>
+              <button class="btn btn-secondary btn-sm" onclick="switchTab('caseshell')">Manage CA</button>
+            </div>
+            <div class="card-body">
+              <div class="info-row">
+                <span class="label">CA Fingerprint:</span>
+                <code class="code-pill" id="dashboard-ca-fingerprint">Detecting...</code>
+              </div>
+              <div class="info-row">
+                <span class="label">Certificate Duration:</span>
+                <span class="value">60 Minutes (Configurable)</span>
+              </div>
+              <div class="info-row">
+                <span class="label">Permanent Keys:</span>
+                <span class="value text-success">0 (Strict Zero-Footprint)</span>
+              </div>
+              <div id="dashboard-servers-preview" class="servers-preview-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GeoLarva Global Map Preview -->
+        <div class="card">
+          <div class="card-header">
+            <h3><span class="icon">🌍</span> GeoLarva Multi-Region Mesh Status</h3>
+            <button class="btn btn-secondary btn-sm" onclick="switchTab('geolarva')">Run Global Probes</button>
+          </div>
+          <div class="card-body">
+            <div class="regions-grid" id="dashboard-regions-grid"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: PHRYXTUNNEL -->
+      <section class="tab-pane" id="pane-tunnel">
+        <div class="page-intro">
+          <div>
+            <h2>PhryxTunnel — The ngrok Killer</h2>
+            <p>Instantly expose your local services to an ephemeral public URL via GitHub Actions runner relays.</p>
+          </div>
+        </div>
+
+        <div class="grid-2-cols">
+          <!-- Launcher Form -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Launch Ephemeral Tunnel</h3>
+            </div>
+            <div class="card-body">
+              <form id="tunnel-form" class="form-vertical">
+                <div class="form-group">
+                  <label for="tun-port">Local Target Port</label>
+                  <input type="number" id="tun-port" class="form-control" placeholder="3000" value="3000" required />
+                  <span class="help-text">The localhost port you want to tunnel to the public internet.</span>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="tun-protocol">Protocol</label>
+                    <select id="tun-protocol" class="form-control">
+                      <option value="http">HTTP / REST</option>
+                      <option value="https">HTTPS</option>
+                      <option value="tcp">Raw TCP</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="tun-timeout">Timeout (Minutes)</label>
+                    <input type="number" id="tun-timeout" class="form-control" value="30" min="5" max="360" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="tun-subdomain">Custom Subdomain / Alias (Optional)</label>
+                  <input type="text" id="tun-subdomain" class="form-control" placeholder="my-preview-app" />
+                  <span class="help-text">Generates https://my-preview-app.ballom.terra.mesh</span>
+                </div>
+
+                <div class="form-group">
+                  <label for="tun-auth">Auth Token Protection (Optional)</label>
+                  <input type="text" id="tun-auth" class="form-control" placeholder="Leave empty for public access" />
+                  <span class="help-text">Clients must pass this in X-Phryx-Token header.</span>
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary" id="btn-start-tunnel">
+                    🚀 Launch Tunnel
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="btn-copy-tunnel-cli">
+                    📋 Copy CLI Command
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Active Sessions & Live Traffic Inspector -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Active Sessions</h3>
+              <span class="pulse-dot"></span>
+            </div>
+            <div class="card-body">
+              <div id="tunnel-sessions-container" class="sessions-list">
+                <div class="empty-state">No tunnel running. Fill the form to launch one.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Request Log Inspector -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3><span class="icon">📡</span> Live Request Inspector</h3>
+            <span class="badge" id="traffic-count-badge">0 requests</span>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="data-table" id="table-tunnel-logs">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Method</th>
+                    <th>Path</th>
+                    <th>Status</th>
+                    <th>Latency</th>
+                    <th>Bytes In / Out</th>
+                    <th>Client IP</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-tunnel-logs">
+                  <tr>
+                    <td colspan="7" class="text-center text-muted">Awaiting traffic on active tunnels...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CASESHELL (SSH CA) -->
+      <section class="tab-pane" id="pane-caseshell">
+        <div class="page-intro">
+          <div>
+            <h2>CaseShell — Zero-Trust Ephemeral SSH</h2>
+            <p>SSH Certificate Authority with 60-minute cryptographic certificates. No permanent keys. Zero rotation overhead.</p>
+          </div>
+        </div>
+
+        <div class="grid-2-cols">
+          <!-- Register Server -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Register Target Host</h3>
+            </div>
+            <div class="card-body">
+              <form id="caseshell-register-form" class="form-vertical">
+                <div class="form-group">
+                  <label for="ssh-alias">Server Alias</label>
+                  <input type="text" id="ssh-alias" class="form-control" placeholder="myserver" required />
+                </div>
+                <div class="form-group">
+                  <label for="ssh-host">Host / IP</label>
+                  <input type="text" id="ssh-host" class="form-control" placeholder="192.168.1.50 or vps.example.com" required />
+                </div>
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="ssh-user">SSH Username</label>
+                    <input type="text" id="ssh-user" class="form-control" value="ubuntu" required />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="ssh-port">SSH Port</label>
+                    <input type="number" id="ssh-port" class="form-control" value="22" required />
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">➕ Register Server</button>
+                </div>
+              </form>
+
+              <!-- Setup Snippet Output -->
+              <div id="ssh-setup-box" class="setup-snippet-box hidden mt-4">
+                <div class="snippet-header">
+                  <span>Run once on target server:</span>
+                  <button class="btn btn-xs btn-secondary" onclick="copySnippet('ssh-setup-code')">Copy</button>
+                </div>
+                <pre><code id="ssh-setup-code"></code></pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- Issue Ephemeral Certificate -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Issue 60-Minute Certificate</h3>
+            </div>
+            <div class="card-body">
+              <form id="caseshell-cert-form" class="form-vertical">
+                <div class="form-group">
+                  <label for="cert-server-select">Target Registered Server</label>
+                  <select id="cert-server-select" class="form-control" required>
+                    <option value="">-- Select Server --</option>
+                  </select>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="cert-principal">User Principal (Identity)</label>
+                    <input type="text" id="cert-principal" class="form-control" value="terra-operator" />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="cert-duration">Lifetime (Minutes)</label>
+                    <input type="number" id="cert-duration" class="form-control" value="60" min="5" max="1440" />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="cert-source-ip">Bind to Client IP (Zero-Trust Restriction)</label>
+                  <input type="text" id="cert-source-ip" class="form-control" placeholder="e.g. 203.0.113.19 or leave empty for any IP" />
+                </div>
+
+                <div class="form-group">
+                  <label for="cert-force-command">Force Command (Optional Restriction)</label>
+                  <input type="text" id="cert-force-command" class="form-control" placeholder="e.g. systemctl status nginx" />
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-accent">⚡ Mint Ephemeral Cert</button>
+                </div>
+              </form>
+
+              <!-- Issued Cert Box -->
+              <div id="cert-result-box" class="cert-result-box hidden mt-4">
+                <div class="snippet-header">
+                  <span class="text-success">✔ Certificate Issued</span>
+                  <span id="cert-expires-tag" class="badge">60m</span>
+                </div>
+                <div class="ssh-cmd-preview">
+                  <label>SSH Connection Command:</label>
+                  <div class="copy-bar">
+                    <input type="text" id="cert-ssh-cmd" readonly class="form-control code-font" />
+                    <button class="btn btn-secondary btn-sm" onclick="copySnippet('cert-ssh-cmd', true)">Copy</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registered Servers Table -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3>Registered Servers Directory</h3>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Alias</th>
+                    <th>Host</th>
+                    <th>User</th>
+                    <th>Port</th>
+                    <th>CA Fingerprint</th>
+                    <th>Registered At</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-servers">
+                  <tr><td colspan="7" class="text-center text-muted">No servers registered.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: GEOLARVA -->
+      <section class="tab-pane" id="pane-geolarva">
+        <div class="page-intro">
+          <div>
+            <h2>GeoLarva — Multi-Region Exit Node Mesh</h2>
+            <p>Benchmark API latencies, verify geofencing, and route requests through ephemeral runners across 6 global regions.</p>
+          </div>
+        </div>
+
+        <!-- Probe Launcher -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Launch Geographic Probe</h3>
+          </div>
+          <div class="card-body">
+            <form id="geo-probe-form" class="form-inline-action">
+              <input type="url" id="geo-url" class="form-control flex-3" placeholder="https://my-api.com/health or https://example.com" required />
+              <select id="geo-region-select" class="form-control flex-1">
+                <option value="all">🌐 All Regions (Parallel Matrix)</option>
+                <option value="east-us">🇺🇸 US East (Virginia)</option>
+                <option value="west-europe">🇳🇱 Western Europe (Amsterdam)</option>
+                <option value="southeast-asia">🇯🇵 Southeast Asia (Tokyo)</option>
+                <option value="brazil-south">🇧🇷 Brazil South (São Paulo)</option>
+                <option value="australia-east">🇦🇺 Australia East (Sydney)</option>
+                <option value="south-africa">🇿🇦 South Africa (Johannesburg)</option>
+              </select>
+              <button type="submit" class="btn btn-primary" id="btn-run-probe">
+                ⚡ Probe Now
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Results Matrix -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3>Probe Results Matrix</h3>
+            <span id="geo-matrix-status" class="badge">Ready</span>
+          </div>
+          <div class="card-body">
+            <div id="geo-results-container">
+              <div class="empty-state">Select a target URL and launch a probe to view comparative global latencies.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historical Probes -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3>Probe History</h3>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Target URL</th>
+                    <th>Fastest Region</th>
+                    <th>Slowest Region</th>
+                    <th>Avg Latency</th>
+                    <th>Availability</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-geo-history">
+                  <tr><td colspan="6" class="text-center text-muted">No probe history recorded yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: PHRYXREACH (SILKFILTER) -->
+      <section class="tab-pane" id="pane-reach">
+        <div class="page-intro">
+          <div>
+            <h2>PhryxReach & SilkFilter — Dynamic Cloud ACLs</h2>
+            <p>Inject CI/CD runner IPs into cloud security groups dynamically before jobs and guarantee clean auto-purge on completion.</p>
+          </div>
+        </div>
+
+        <div class="grid-2-cols">
+          <!-- Add Provider -->
+          <div class="card">
+            <div class="card-header">
+              <h3>Register Cloud Provider ACL</h3>
+            </div>
+            <div class="card-body">
+              <form id="reach-provider-form" class="form-vertical">
+                <div class="form-group">
+                  <label for="reach-provider-type">Cloud Provider</label>
+                  <select id="reach-provider-type" class="form-control" required>
+                    <option value="aws-security-group">AWS Security Groups (EC2/RDS)</option>
+                    <option value="cloudflare-ip-rule">Cloudflare WAF IP Access Rules</option>
+                    <option value="digitalocean-firewall">DigitalOcean Cloud Firewall</option>
+                    <option value="hetzner-firewall">Hetzner Cloud Firewall</option>
+                    <option value="supabase-network">Supabase Network Restrictions</option>
+                    <option value="mongodb-atlas">MongoDB Atlas IP Access List</option>
+                    <option value="railway-private">Railway Private Networking</option>
+                    <option value="generic-webhook">Generic Webhook / Custom API</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="reach-resource-id">Resource Identifier</label>
+                  <input type="text" id="reach-resource-id" class="form-control" placeholder="e.g. sg-0abc123 or firewall-id" required />
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="reach-port">Target Port</label>
+                    <input type="number" id="reach-port" class="form-control" value="5432" required />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="reach-protocol">Protocol</label>
+                    <select id="reach-protocol" class="form-control">
+                      <option value="tcp">TCP</option>
+                      <option value="udp">UDP</option>
+                      <option value="all">ALL</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary">➕ Save Provider Config</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Live Rule Injector / Purger -->
+          <div class="card">
+            <div class="card-header">
+              <h3>SilkFilter Live IP Testing</h3>
+            </div>
+            <div class="card-body">
+              <form id="silkfilter-test-form" class="form-vertical">
+                <div class="form-group">
+                  <label for="silk-provider-select">Target Provider</label>
+                  <select id="silk-provider-select" class="form-control" required>
+                    <option value="">-- Select Configured Provider --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="silk-ip">IP Address to Inject</label>
+                  <div class="input-with-action">
+                    <input type="text" id="silk-ip" class="form-control" placeholder="Leave empty for auto-detected IP" />
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-detect-ip">Detect IP</button>
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-accent" id="btn-inject-rule">🔒 Inject Rule</button>
+                  <button type="button" class="btn btn-danger" id="btn-purge-all">🧹 Purge All Active Rules</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Rules & Audit History -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3>SilkFilter Audit Log (Injections & Purges)</h3>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Action</th>
+                    <th>Provider</th>
+                    <th>Resource</th>
+                    <th>IP</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-reach-logs">
+                  <tr><td colspan="6" class="text-center text-muted">No ACL operations logged yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: STORAGE VAULT -->
+      <section class="tab-pane" id="pane-storage">
+        <div class="page-intro">
+          <div>
+            <h2>Storage Vault — .phryx-storage Inspector</h2>
+            <p>Audit trail and persistent state synchronized across GitHub Releases and the Git Database API at $0 cost.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Storage Repository State</h3>
+            <span class="badge" id="storage-type-badge">Local Fallback</span>
+          </div>
+          <div class="card-body">
+            <div class="info-row">
+              <span class="label">Vault Target:</span>
+              <code class="code-pill" id="storage-target-path">.phryx_storage</code>
+            </div>
+            <div class="info-row">
+              <span class="label">Connection Status:</span>
+              <span class="text-success" id="storage-conn-status">Operational</span>
+            </div>
+
+            <h4 class="mt-4 mb-2">Vault Directory Tree</h4>
+            <div class="vault-tree" id="vault-tree-container">
+              <div class="tree-item">📁 tunnel-sessions/ (Active and historical tunnels)</div>
+              <div class="tree-item">📁 ssh/ (servers.json, CA keys, active sessions)</div>
+              <div class="tree-item">📁 reach/ (providers.json, rules.json, ACL audit history)</div>
+              <div class="tree-item">📁 geo/history/ (Multi-region probe matrices)</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: SETTINGS -->
+      <section class="tab-pane" id="pane-settings">
+        <div class="page-intro">
+          <div>
+            <h2>Phryx Configuration & Secrets</h2>
+            <p>Customize token credentials, default timeouts, and storage parameters.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>System Settings</h3>
+          </div>
+          <div class="card-body">
+            <form id="settings-form" class="form-vertical">
+              <div class="form-group">
+                <label for="set-repo">Storage Repository (.phryx-storage)</label>
+                <input type="text" id="set-repo" class="form-control" value="amglogicalis/.phryx-storage" />
+              </div>
+
+              <div class="form-group">
+                <label for="set-token">GitHub Personal Access Token (PAT)</label>
+                <input type="password" id="set-token" class="form-control" placeholder="ghp_... or gho_..." />
+                <span class="help-text">Stored safely in your browser session for storage updates.</span>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group flex-1">
+                  <label for="set-tun-timeout">Default Tunnel Timeout (min)</label>
+                  <input type="number" id="set-tun-timeout" class="form-control" value="30" />
+                </div>
+                <div class="form-group flex-1">
+                  <label for="set-ssh-duration">Default SSH Cert Lifetime (min)</label>
+                  <input type="number" id="set-ssh-duration" class="form-control" value="60" />
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-primary">💾 Save Settings</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
