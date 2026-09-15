@@ -205,6 +205,22 @@ function initNavigation() {
     });
   });
 
+  // Onboarding pills smooth scroll
+  document.querySelectorAll('.onb-pill').forEach((pill) => {
+    pill.addEventListener('click', (e) => {
+      const targetId = pill.getAttribute('href');
+      if (targetId && targetId.startsWith('#')) {
+        e.preventDefault();
+        const targetEl = document.querySelector(targetId);
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          document.querySelectorAll('.onb-pill').forEach((p) => p.classList.remove('active'));
+          pill.classList.add('active');
+        }
+      }
+    });
+  });
+
   document.getElementById('btn-refresh')?.addEventListener('click', () => {
     loadAllData();
   });
@@ -228,6 +244,7 @@ function switchTab(tabId) {
     geolarva: 'GeoLarva Multi-Region Prober',
     reach: 'PhryxReach & SilkFilter ACL',
     silkroute: 'SilkRoute Cloud Proxy Gateway',
+    onboarding: 'Onboarding & Master Guide',
   };
 
   const titleEl = document.getElementById('current-tab-title');

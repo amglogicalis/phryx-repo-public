@@ -87,6 +87,10 @@
           <span class="label">SilkRoute Proxy</span>
           <span class="badge" id="route-active-badge">0</span>
         </button>
+        <button class="nav-item" data-tab="onboarding">
+          <span class="icon">📚</span>
+          <span class="label">Onboarding & Guía</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -852,6 +856,372 @@
                   <tr><td colspan="8" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: ONBOARDING & MASTER DOCUMENTATION -->
+      <section class="tab-pane" id="pane-onboarding">
+        <div class="page-intro">
+          <div>
+            <h2>📚 Onboarding & Guía Maestra de Phryx</h2>
+            <p>Manual interactivo exhaustivo: Arquitectura Zero-Trust, flujos paso a paso de cada especie, buenas y malas prácticas recomendadas, y preguntas frecuentes (FAQ).</p>
+          </div>
+        </div>
+
+        <div class="onboarding-container">
+          <!-- Sticky Navigation Pills -->
+          <div class="onboarding-pills">
+            <a class="onb-pill" href="#onb-caseshell">🐚 CaseShell (SSH CA)</a>
+            <a class="onb-pill" href="#onb-tunnel">🌐 PhryxTunnel</a>
+            <a class="onb-pill" href="#onb-silkroute">🛸 SilkRoute Proxy</a>
+            <a class="onb-pill" href="#onb-reach">🔗 SilkFilter ACL</a>
+            <a class="onb-pill" href="#onb-geolarva">🌍 GeoLarva Prober</a>
+            <a class="onb-pill" href="#onb-practices">💡 Buenas vs Malas Prácticas</a>
+            <a class="onb-pill" href="#onb-faq">❓ FAQ & Troubleshooting</a>
+          </div>
+
+          <!-- SECTION 1: CASESHELL (SSH CA) -->
+          <div class="card" id="onb-caseshell">
+            <div class="card-header">
+              <h3><span class="icon">🐚</span> CaseShell — Zero-Trust Ephemeral SSH</h3>
+              <span class="badge">Especie 1</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>¿Qué es y por qué existe?</h3>
+                <p>La gestión tradicional basada en copiar claves públicas en <code>~/.ssh/authorized_keys</code> genera "key sprawl" permanente: nadie sabe a quién pertenece cada clave, si un ex-empleado sigue teniendo acceso o si una clave privada se ha filtrado. <strong>CaseShell sustituye las claves permanentes por certificados OpenSSH de 15 a 60 minutos firmados digitalmente por una Autoridad Certificadora (CA) propia a $0 infraestructura.</strong></p>
+              </div>
+
+              <div class="onb-steps-grid">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Setup Day-0 (Solo 1 vez)</h4>
+                  <p>Registra el servidor en la consola o CLI. Phryx genera un snippet de 3 líneas que confía en la clave pública de la CA en <code>/etc/ssh/sshd_config</code>.</p>
+                  <pre><code>echo "ssh-ed25519 AAAAC3..." | sudo tee /etc/ssh/phryx_ca.pub
+echo "TrustedUserCAKeys /etc/ssh/phryx_ca.pub" | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart ssh</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Solicitud Just-in-Time (JIT)</h4>
+                  <p>Cuando un dev u operador necesita entrar, solicita un certificado efímero indicando usuario, duración exacta y ticket de auditoría (Key ID).</p>
+                  <pre><code>phryx ssh cert prod-db \
+  --principal operator \
+  --duration 30 \
+  --key-id INC-402</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Conexión Transparente</h4>
+                  <p>Phryx emite el certificado firmado con Ed25519 y te entrega el comando OpenSSH con todos los flags listos para usar inmediatamente.</p>
+                  <pre><code>ssh -i "/tmp/phryx_cert_*.key" \
+  -p 22 ubuntu@10.0.1.25</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">4</div>
+                  <h4>Expiración Cero Residuo</h4>
+                  <p>Transcurrido el tiempo (ej. 30m), el certificado expira criptográficamente en el propio demonio OpenSSH. Cero mantenimiento manual.</p>
+                  <pre><code>Certificate expired at 12:45:00.
+Access denied cryptographically.
+Zero orphan keys remaining.</code></pre>
+                </div>
+              </div>
+
+              <!-- Flexibilidad y Parámetros -->
+              <div class="mt-4" style="background: rgba(128,60,255,0.06); padding: 18px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                <h4 style="color: var(--secondary-aqua); margin-bottom: 8px;">⚙️ Máxima Flexibilidad y Parámetros de Seguridad:</h4>
+                <ul style="margin-left: 20px; line-height: 1.7; font-size: 0.88rem; color: var(--text-primary);">
+                  <li><strong>Custom Client Public Key:</strong> Puedes pegar tu propia clave pública (ej. <code>~/.ssh/id_ed25519.pub</code>). En ese caso la CA firma tu clave directamente sin generar archivos de clave privada temporales en disco.</li>
+                  <li><strong>Audit Key ID:</strong> Identificador incrustado para compliance (ej. <code>JIRA-4902-hotfix</code>).</li>
+                  <li><strong>Extensiones OpenSSH:</strong> Conmutadores para activar o revocar <code>permit-pty</code> (terminal), <code>permit-port-forwarding</code> (túneles <code>-L/-R</code>), <code>permit-agent-forwarding</code> (agente <code>-A</code>), etc.</li>
+                  <li><strong>Restricción de IP de Origen:</strong> El certificado solo es válido si la conexión proviene de la IP o subred indicada (ej. <code>203.0.113.19/32</code>).</li>
+                  <li><strong>Comando Forzado:</strong> Limita la sesión al arranque estricto de un comando específico (ej. <code>htop</code> o <code>systemctl status nginx</code>).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 2: PHRYXTUNNEL -->
+          <div class="card" id="onb-tunnel">
+            <div class="card-header">
+              <h3><span class="icon">🌐</span> PhryxTunnel — Localhost to Public Internet ($0)</h3>
+              <span class="badge">Especie 2</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Túneles inversos efímeros para webhooks y testing local</h3>
+                <p>Publica cualquier puerto local de tu equipo (ej. <code>localhost:3000</code>) a una URL HTTPS pública accesible globalmente para probar webhooks de Stripe, GitHub, Shopify o demos directas a clientes, sin pagar suscripciones mensuales de ngrok ni ngrok limits.</p>
+              </div>
+
+              <div class="onb-steps-grid">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Exclusivo de Entorno Local</h4>
+                  <p>Los navegadores en GitHub Pages no pueden interceptar ni escuchar los puertos físicos de tu máquina. Por ello, el túnel se arranca desde tu terminal o consola local.</p>
+                  <pre><code>phryx tunnel --port 3000 \
+  --timeout 30 \
+  --auth mi-secreto</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Autenticación Obligatoria</h4>
+                  <p>Protege tu endpoint con un token de autorización. Cualquier petición entrante deberá suministrar el header <code>X-Phryx-Token: &lt;token&gt;</code> para alcanzar tu servidor.</p>
+                  <pre><code>curl -H "X-Phryx-Token: mi-secreto" \
+  https://tunnel.phryx.terra/xyz</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Auto-Cierre & Inspector</h4>
+                  <p>Al llegar el timeout configurado (ej. 30 minutos), el túnel se disuelve automáticamente. La consola web inspecciona en tiempo real latencia, bytes y códigos de estado.</p>
+                  <pre><code>200 OK | POST /webhook/stripe
+Latency: 14ms | Bytes: 412B</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3: SILKROUTE PROXY -->
+          <div class="card" id="onb-silkroute">
+            <div class="card-header">
+              <h3><span class="icon">🛸</span> SilkRoute — Ephemeral Cloud Proxy Gateway</h3>
+              <span class="badge">Especie 3</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Pasarela Proxy Dual SOCKS5 y HTTP CONNECT a $0</h3>
+                <p>Permite desplegar proxies cloud efímeros alojados en infraestructura de GitHub Actions para enrutar tráfico residencial/cloud, realizar scraping web, pruebas de penetración o eludir bloqueos geográficos sin alquilar servidores proxy de pago.</p>
+              </div>
+
+              <div class="onb-steps-grid">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Despliegue Instantáneo</h4>
+                  <p>Arranca un gateway en la región deseada seleccionando protocolo SOCKS5 (RFC 1928), HTTP CONNECT o dual con credenciales generadas al vuelo.</p>
+                  <pre><code>phryx route spawn \
+  --region west-europe \
+  --protocol dual \
+  --duration 60</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Lazarus Relay 24/7</h4>
+                  <p>GitHub Actions impone un tope de 6 horas por job. SilkRoute integra <strong>Lazarus Relay</strong>: antes de morir a las 5h 50m, despacha automáticamente el relevo continuo sin cortes.</p>
+                  <pre><code>Self-re-executing relay:
+Job N-1 handshakes with Job N
+24/7 uninterrupted gateway.</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Enrutamiento Global</h4>
+                  <p>Conecta tus herramientas favoritas (cURL, Python Requests, Playwright, Scrapy o navegadores) con una simple variable de entorno en tu terminal.</p>
+                  <pre><code>export ALL_PROXY="socks5://user:pass@ip:1080"
+curl https://ifconfig.me</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 4: SILKFILTER ACL -->
+          <div class="card" id="onb-reach">
+            <div class="card-header">
+              <h3><span class="icon">🔗</span> PhryxReach & SilkFilter — Dynamic Cloud ACLs</h3>
+              <span class="badge">Especie 4</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Inyección JIT de IPs en Security Groups y Auto-Purga Garantizada</h3>
+                <p>Las bases de datos y clusters en la nube no deben estar expuestos a <code>0.0.0.0/0</code>. SilkFilter detecta la IP pública efímera del runner de CI/CD, la inyecta temporalmente en el Security Group de AWS o Cloudflare, y <strong>garantiza su purga limpia al finalizar el pipeline</strong>.</p>
+              </div>
+
+              <div class="onb-steps-grid">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Detección de IP del Runner</h4>
+                  <p>Al arrancar el pipeline de pruebas o despliegue, el runner consulta su IP de salida dinámica sin intervención manual.</p>
+                  <pre><code>RUNNER_IP=$(curl -s https://ifconfig.me)</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Inyección de Regla Ingress</h4>
+                  <p>Abre el puerto exacto (ej. 5432 Postgres) únicamente para la IP del runner durante la ejecución de las pruebas.</p>
+                  <pre><code>phryx reach add --provider aws-sg \
+  --resource sg-0abc123 --port 5432</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Garantía always() Auto-Purge</h4>
+                  <p>El paso de purga usa <code>if: always()</code> en el workflow de Actions. Incluso si el build falla o explota, la regla se elimina sin dejar agujeros.</p>
+                  <pre><code>- name: Purge Ephemeral Ingress
+  if: always()
+  run: phryx reach purge $RULE_ID</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 5: GEOLARVA -->
+          <div class="card" id="onb-geolarva">
+            <div class="card-header">
+              <h3><span class="icon">🌍</span> GeoLarva — Multi-Region Edge Prober</h3>
+              <span class="badge">Especie 5</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Sondeo de latencia y disponibilidad global desde 6 continentes</h3>
+                <p>Ejecuta sondas sintéticas en paralelo desde runners ubicados en US East, West Europe, Southeast Asia, Brazil, Australia y South Africa para auditar CDN, DNS y TTFB sin pagar servicios como Pingdom o New Relic.</p>
+              </div>
+              <pre><code># Probar URL contra toda la matriz global en paralelo
+phryx geo https://mi-api.com --all</code></pre>
+            </div>
+          </div>
+
+          <!-- SECTION 6: BUENAS Y MALAS PRÁCTICAS -->
+          <div class="card" id="onb-practices">
+            <div class="card-header">
+              <h3><span class="icon">💡</span> Tabla de Buenas y Malas Prácticas (Do's & Don'ts)</h3>
+              <span class="badge">Seguridad & Operaciones</span>
+            </div>
+            <div class="card-body">
+              <div class="practice-grid">
+                <!-- BUENAS PRACTICAS -->
+                <div class="practice-card good">
+                  <div class="practice-header">
+                    <span>✔</span>
+                    <span>BUENAS PRÁCTICAS (RECOMENDADO)</span>
+                  </div>
+                  <ul class="practice-list">
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Duración SSH mínima estricta:</strong> Solicita certificados de 15 a 30 minutos para tareas de mantenimiento puntual. Cuanto más corta la validez, menor la ventana de riesgo.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Asociar siempre un Audit Key ID:</strong> Indica el número de ticket JIRA o incidencia (ej. <code>INC-1094</code>) para garantizar trazabilidad legal y de auditoría.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Firma de Clave Pública Personal:</strong> Pega tu <code>id_ed25519.pub</code> habitual para que tu clave privada nunca viaje ni se escriba en ficheros temporales.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Proteger Túneles con Token de Autenticación:</strong> Configura siempre un <code>--auth</code> en tus túneles locales para impedir escaneos no autorizados.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Garantizar Post-Purge con if: always():</strong> En pipelines CI/CD, asegura que la regla de firewall abierta para el runner se cierre aunque el job falle.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Lazarus Relay para tareas largas:</strong> Utiliza el modo Lazarus si requieres proxies SOCKS5 durante más de 6 horas para evitar caídas imprevistas.</div>
+                    </li>
+                  </ul>
+                </div>
+
+                <!-- MALAS PRACTICAS -->
+                <div class="practice-card bad">
+                  <div class="practice-header">
+                    <span>✖</span>
+                    <span>MALAS PRÁCTICAS (A EVITAR)</span>
+                  </div>
+                  <ul class="practice-list">
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Dejar claves permanentes en authorized_keys:</strong> No añadas claves públicas estáticas que queden olvidadas en los servidores durante años.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Certificados de 24 horas por comodidad:</strong> No emitas certificados de 1440 minutos para una intervención de 10 minutos.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Abrir 0.0.0.0/0 en Security Groups de Base de Datos:</strong> Nunca dejes el puerto 5432 o 3306 abierto a toda la red para que un runner de CI/CD pueda correr migraciones.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Túneles locales públicos sin timeout:</strong> No dejes túneles abiertos en segundo plano indefinidamente en tu equipo de desarrollo.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Compartir claves privadas temporales:</strong> No copies archivos <code>.key</code> temporales por Slack o correo; cada operador debe solicitar su propio certificado individual.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Ignorar la restricción de IP:</strong> Si conoces la IP de origen del operador o runner, no dejes el campo de IP vacío.</div>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 7: FAQ & PREGUNTAS FRECUENTES -->
+          <div class="card" id="onb-faq">
+            <div class="card-header">
+              <h3><span class="icon">❓</span> Preguntas Frecuentes (FAQ & Troubleshooting)</h3>
+              <span class="badge">Respuestas Rápidas</span>
+            </div>
+            <div class="card-body">
+              <div class="faq-list">
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Tiene algún coste de infraestructura o requiere servidores dedicados?</summary>
+                  <div class="faq-content">
+                    <strong>Rotundamente no ($0 de coste).</strong> Todo el ecosistema Phryx aprovecha la computación efímera de GitHub Actions runners y criptografía local OpenSSH. No requiere clústeres de Vault, ni servidores Teleport de pago, ni agentes de fondo persistentes.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Qué sucede con mi sesión SSH activa cuando el certificado expira?</summary>
+                  <div class="faq-content">
+                    OpenSSH valida la fecha y hora de expiración en el momento del <strong>handshake inicial</strong> de conexión. Si la conexión ya está abierta y el certificado expira a los 30 minutos, la sesión establecida permanecerá activa mientras no te desconectes. Sin embargo, no será posible abrir <strong>ninguna nueva conexión</strong> ni re-autenticarse con ese certificado una vez superada la hora de caducidad.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Por qué PhryxTunnel no se puede iniciar directamente desde GitHub Pages?</summary>
+                  <div class="faq-content">
+                    Por motivos de seguridad del modelo de Sandbox de los navegadores web. Un navegador en <code>https://amglogicalis.github.io</code> no tiene privilegios para interceptar puertos locales (como <code>localhost:3000</code>) en tu ordenador físico. Por ello, PhryxTunnel se ejecuta desde tu terminal con <code>phryx tunnel --port 3000</code> o arrancando la consola local con <code>phryx console</code>.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Cómo garantiza SilkRoute persistencia 24/7 si GitHub limita los runners a 6 horas?</summary>
+                  <div class="faq-content">
+                    Mediante el motor <strong>Lazarus Relay</strong>. El runner calcula la hora límite de expiración (5 horas y 50 minutos) y, antes de finalizar, efectúa una llamada a la API de GitHub Actions (<code>workflow_dispatch</code>) despachando un nuevo runner sucesor. La sesión y credenciales se transfieren en milisegundos, manteniendo el proxy disponible de forma ininterrumpida.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Puedo usar mi propia clave pública SSH sin generar archivos temporales en disco?</summary>
+                  <div class="faq-content">
+                    <strong>Sí.</strong> En el formulario de emisión de CaseShell o en la CLI con el flag <code>--pub ~/.ssh/id_ed25519.pub</code>, puedes suministrar tu clave pública existente. La CA de Phryx firmará tu clave personal y no se escribirá ninguna clave privada en disco, conectándote directamente con tu par habitual.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Dónde se guardan los datos y el historial de sesiones?</summary>
+                  <div class="faq-content">
+                    En tu propio repositorio privado <code>.phryx-storage</code> de GitHub a través del PAT autenticado, y en almacenamiento local en <code>.phryx_storage/</code>. No existen bases de datos de terceros ni telemetría externa.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Qué versiones de OpenSSH son compatibles con CaseShell?</summary>
+                  <div class="faq-content">
+                    Cualquier versión de OpenSSH 5.4 o superior (lanzada en 2010). El soporte para <code>TrustedUserCAKeys</code> y certificados Ed25519 es nativo en todas las distribuciones modernas de Linux (Ubuntu, Debian, RedHat, Amazon Linux, Alpine, CentOS, etc.) sin necesidad de instalar agentes ni software adicional.
+                  </div>
+                </details>
+              </div>
             </div>
           </div>
         </div>
