@@ -189,6 +189,66 @@ const vaultClient = {
     return null;
   },
 
+  async getRawFile(relPath) {
+    if (!state.ghToken) return null;
+    const repoFullName = this.getRepo();
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.content) {
+          return decodeURIComponent(escape(atob(json.content.replace(/\s/g, ''))));
+        }
+      }
+    } catch (err) {
+      // Not found or network error
+    }
+    return null;
+  },
+
+  async setRawFile(relPath, rawStr, commitMsg) {
+    if (!state.ghToken) return false;
+    const repoFullName = this.getRepo();
+    try {
+      let sha = undefined;
+      try {
+        const checkRes = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+          headers: {
+            Authorization: `Bearer ${state.ghToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+        });
+        if (checkRes.ok) {
+          const cur = await checkRes.json();
+          sha = cur.sha;
+        }
+      } catch {}
+
+      const contentBase64 = btoa(unescape(encodeURIComponent(rawStr)));
+      const body = { message: commitMsg || `phryx(web-console): update ${relPath}`, content: contentBase64 };
+      if (sha) body.sha = sha;
+
+      const putRes = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      return putRes.ok;
+    } catch (err) {
+      console.warn('[VaultClient] Error writing raw file to vault:', err);
+      return false;
+    }
+  },
+
   async setFile(relPath, data, commitMsg) {
     if (!state.ghToken) return false;
     const repoFullName = this.getRepo();
@@ -1171,22 +1231,126 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
         sshCommand = certData.sshCommand;
       }
     } else {
-      certData = {
-        serial: `phryx_cert_${Date.now()}`,
-        keyId: keyId || `phryx-${principal}-${serverAlias}-${Date.now()}`,
-        durationMinutes: duration,
-        validBefore: new Date(Date.now() + duration * 60000).toISOString(),
-        extensions,
-        principals: [principal],
-        hasEphemeralPrivateKey: !publicKey,
-      };
-      const s = state.servers.find((x) => x.alias === serverAlias);
-      const portFlag = s && s.port !== 22 ? ` -p ${s.port}` : '';
-      const u = s ? s.user : 'root';
-      const h = s ? s.host : serverAlias;
-      const cmdSuffix = forceCommand ? ` -- "${forceCommand}"` : '';
-      const keyFlag = publicKey ? '' : ` -i /tmp/${certData.serial}.key`;
-      sshCommand = `ssh${keyFlag}${portFlag} ${u}@${h}${cmdSuffix}`;
+      // ── REAL Ed25519 WebCrypto signing ─────────────────────────────────────
+      try {
+        // Helper: PEM → ArrayBuffer
+        const pemToArrayBuffer = (pem) => {
+          const b64 = pem.replace(/-----[^\n]+-----/g, '').replace(/\s+/g, '');
+          return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)).buffer;
+        };
+
+        // Helper: ArrayBuffer → base64
+        const bufToBase64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+
+        // Helper: ArrayBuffer → PEM block
+        const toPem = (buf, label) => {
+          const b64 = bufToBase64(buf);
+          return `-----BEGIN ${label}-----\n${b64.match(/.{1,64}/g).join('\n')}\n-----END ${label}-----`;
+        };
+
+        // 1. Load CA private key from vault
+        const caPrivPem = await vaultClient.getRawFile('ssh/phryx_ca.key');
+        if (!caPrivPem) throw new Error('CA private key not found in vault (ssh/phryx_ca.key)');
+
+        const caPrivKey = await crypto.subtle.importKey(
+          'pkcs8',
+          pemToArrayBuffer(caPrivPem),
+          { name: 'Ed25519' },
+          false,
+          ['sign'],
+        );
+
+        // 2. Client key: use provided public key OR generate ephemeral Ed25519 keypair
+        let clientPubPem = publicKey || null;
+        let ephemeralPrivPem = null;
+        let ephemeralKeyPair = null;
+
+        if (!clientPubPem) {
+          ephemeralKeyPair = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+          const spkiBuf = await crypto.subtle.exportKey('spki', ephemeralKeyPair.publicKey);
+          clientPubPem = toPem(spkiBuf, 'PUBLIC KEY');
+          const pkcs8Buf = await crypto.subtle.exportKey('pkcs8', ephemeralKeyPair.privateKey);
+          ephemeralPrivPem = toPem(pkcs8Buf, 'PRIVATE KEY');
+        }
+
+        // 3. Build cert payload (matches caseshell.ts structure exactly)
+        const nowMs = Date.now();
+        const randBytes = crypto.getRandomValues(new Uint8Array(4));
+        const serial = `phryx_cert_${nowMs}_${Array.from(randBytes).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+        const validAfter = new Date(nowMs).toISOString();
+        const validBefore = new Date(nowMs + duration * 60000).toISOString();
+        const resolvedKeyId = keyId || `phryx-${principal}-${serverAlias}-${nowMs}`;
+
+        const certPayload = JSON.stringify({
+          serial,
+          keyId: resolvedKeyId,
+          principals: [principal],
+          validAfter,
+          validBefore,
+          sourceAddress: sourceIp || undefined,
+          forceCommand: forceCommand || undefined,
+          extensions,
+          publicKey: clientPubPem,
+        });
+
+        // 4. Sign with CA private key
+        const payloadBytes = new TextEncoder().encode(certPayload);
+        const sigBuf = await crypto.subtle.sign('Ed25519', caPrivKey, payloadBytes);
+        const signature = bufToBase64(sigBuf);
+
+        // 5. Build PHRYX SSH CERTIFICATE PEM block
+        const certBody = btoa(unescape(encodeURIComponent(JSON.stringify({ payload: certPayload, signature }))));
+        const certPem = `-----BEGIN PHRYX SSH CERTIFICATE-----\n${certBody.match(/.{1,64}/g).join('\n')}\n-----END PHRYX SSH CERTIFICATE-----`;
+
+        certData = {
+          serial,
+          keyId: resolvedKeyId,
+          durationMinutes: duration,
+          validAfter,
+          validBefore,
+          extensions,
+          principals: [principal],
+          hasEphemeralPrivateKey: !publicKey,
+          signature,
+          certPem,
+          clientPubPem,
+          ephemeralPrivPem, // null if custom public key was provided
+        };
+
+        // 6. Build SSH command
+        const s = state.servers.find((x) => x.alias === serverAlias);
+        const portFlag = s && s.port !== 22 ? ` -p ${s.port}` : '';
+        const u = s ? s.user : 'root';
+        const h = s ? s.host : serverAlias;
+        const cmdSuffix = forceCommand ? ` -- "${forceCommand}"` : '';
+        const keyFlag = !publicKey ? ` -i /tmp/${serial}.key` : '';
+        sshCommand = `ssh${keyFlag}${portFlag} ${u}@${h}${cmdSuffix}`;
+
+        // 7. Inject cert PEM and private key download into result box
+        const certPemBox = document.getElementById('cert-pem-data');
+        if (certPemBox) certPemBox.value = certPem;
+
+        const privKeyBtn = document.getElementById('cert-download-privkey');
+        if (privKeyBtn) {
+          if (ephemeralPrivPem) {
+            privKeyBtn.classList.remove('hidden');
+            privKeyBtn.onclick = () => {
+              const blob = new Blob([ephemeralPrivPem], { type: 'text/plain' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = `${serial}.key`;
+              a.click();
+              URL.revokeObjectURL(a.href);
+            };
+          } else {
+            privKeyBtn.classList.add('hidden');
+          }
+        }
+      } catch (cryptoErr) {
+        console.error('[CaseShell] WebCrypto signing failed:', cryptoErr);
+        alert(`⚠️ Certificate minting failed: ${cryptoErr.message}`);
+        return;
+      }
     }
 
     const resultBox = document.getElementById('cert-result-box');
@@ -1198,11 +1362,12 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
       cmdInput.value = sshCommand || `phryx ssh ${serverAlias}`;
       if (expiresTag) expiresTag.textContent = `${duration}m lifetime`;
       if (metaDetails && certData) {
+        const sigDisplay = certData.signature ? `${certData.signature.slice(0, 16)}…` : 'N/A (local API)';
         metaDetails.innerHTML = `
           <div><strong>Serial:</strong> ${certData.serial || 'N/A'} | <strong>Key ID:</strong> ${certData.keyId || 'Auto'}</div>
-          <div><strong>Principals:</strong> ${(certData.principals || [principal]).join(', ')} | <strong>Expires:</strong> ${new Date(certData.validBefore).toLocaleTimeString()}</div>
-          <div><strong>Extensions:</strong> ${(certData.extensions || extensions).join(', ')}</div>
-          <div><strong>Key Mode:</strong> ${certData.hasEphemeralPrivateKey ? '⚡ Ephemeral Keypair (Auto-generated)' : '🔑 Custom Client Public Key'}</div>
+          <div><strong>Principals:</strong> ${(certData.principals || [principal]).join(', ')} | <strong>Valid After:</strong> ${certData.validAfter ? new Date(certData.validAfter).toLocaleTimeString() : 'now'}</div>
+          <div><strong>Expires:</strong> ${new Date(certData.validBefore).toLocaleString()} | <strong>Extensions:</strong> ${(certData.extensions || extensions).join(', ') || 'none'}</div>
+          <div><strong>Key Mode:</strong> ${certData.hasEphemeralPrivateKey ? '⚡ Ephemeral Keypair (Auto-generated)' : '🔑 Custom Client Public Key'} | <strong>Sig:</strong> <code>${sigDisplay}</code></div>
         `;
       }
       resultBox.classList.remove('hidden');
@@ -1213,9 +1378,12 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
           userPrincipal: principal,
           startedAt: new Date().toISOString(),
           durationMinutes: duration,
+          validAfter: certData.validAfter,
           validBefore: certData.validBefore,
           status: 'active',
           keyId: certData.keyId,
+          signature: certData.signature || null,
+          certPem: certData.certPem || null,
         };
         vaultClient.setFile(`ssh/sessions/${certData.serial}.json`, sessionRecord, `phryx(ssh): record session ${certData.serial}`);
       }
@@ -1467,7 +1635,7 @@ function copySnippetText(text) {
 function copySnippet(elementId, isInput = false) {
   const el = document.getElementById(elementId);
   if (!el) return;
-  const text = isInput ? el.value : el.textContent;
+  const text = (isInput || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.textContent;
   navigator.clipboard.writeText(text);
   alert('Copied to clipboard!');
 }
