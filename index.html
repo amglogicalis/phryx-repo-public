@@ -380,11 +380,11 @@
                 <div class="form-row">
                   <div class="form-group flex-1">
                     <label for="ssh-user">SSH Username</label>
-                    <input type="text" id="ssh-user" class="form-control" value="ubuntu" required />
+                    <input type="text" id="ssh-user" class="form-control" placeholder="e.g. root, ubuntu, ec2-user" required />
                   </div>
                   <div class="form-group flex-1">
                     <label for="ssh-port">SSH Port</label>
-                    <input type="number" id="ssh-port" class="form-control" value="22" required />
+                    <input type="number" id="ssh-port" class="form-control" placeholder="22" />
                   </div>
                 </div>
                 <div class="form-actions">
@@ -406,7 +406,7 @@
           <!-- Issue Ephemeral Certificate -->
           <div class="card">
             <div class="card-header">
-              <h3>Issue 60-Minute Certificate</h3>
+              <h3>Issue Ephemeral Zero-Trust Certificate</h3>
             </div>
             <div class="card-body">
               <form id="caseshell-cert-form" class="form-vertical">
@@ -420,22 +420,60 @@
                 <div class="form-row">
                   <div class="form-group flex-1">
                     <label for="cert-principal">User Principal (Identity)</label>
-                    <input type="text" id="cert-principal" class="form-control" value="terra-operator" />
+                    <input type="text" id="cert-principal" class="form-control" placeholder="e.g. operator, devops, deployer" />
                   </div>
                   <div class="form-group flex-1">
                     <label for="cert-duration">Lifetime (Minutes)</label>
-                    <input type="number" id="cert-duration" class="form-control" value="60" min="5" max="1440" />
+                    <input type="number" id="cert-duration" class="form-control" placeholder="60 (or per config)" min="5" max="1440" />
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label for="cert-source-ip">Bind to Client IP (Zero-Trust Restriction)</label>
-                  <input type="text" id="cert-source-ip" class="form-control" placeholder="e.g. 203.0.113.19 or leave empty for any IP" />
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="cert-key-id">Audit Key ID / Label (Optional)</label>
+                    <input type="text" id="cert-key-id" class="form-control" placeholder="e.g. INC-402-hotfix or sec-audit" />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="cert-source-ip">Bind to Client IP / CIDR (Optional)</label>
+                    <input type="text" id="cert-source-ip" class="form-control" placeholder="e.g. 203.0.113.19/32" />
+                  </div>
                 </div>
 
                 <div class="form-group">
                   <label for="cert-force-command">Force Command (Optional Restriction)</label>
-                  <input type="text" id="cert-force-command" class="form-control" placeholder="e.g. systemctl status nginx" />
+                  <input type="text" id="cert-force-command" class="form-control" placeholder="e.g. systemctl status nginx or htop" />
+                </div>
+
+                <div class="form-group">
+                  <label for="cert-public-key">Custom Client Public Key (Optional)</label>
+                  <textarea id="cert-public-key" class="form-control code-font" rows="2" placeholder="ssh-ed25519 AAAAC3... (Optional: paste your ~/.ssh/id_ed25519.pub or leave blank to auto-generate a disposable keypair)"></textarea>
+                  <span class="help-text" style="font-size:0.75rem; color:var(--text-muted);">If provided, certificate signs your existing key so you don't need a downloaded keyfile.</span>
+                </div>
+
+                <div class="form-group">
+                  <label style="display:block; margin-bottom:0.5rem; font-weight:500;">Allowed Extensions & Capabilities</label>
+                  <div style="display:flex; flex-wrap:wrap; gap:12px; font-size:0.85rem;">
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                      <input type="checkbox" class="cert-extension-cb" value="permit-pty" checked />
+                      <span>Interactive PTY</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                      <input type="checkbox" class="cert-extension-cb" value="permit-port-forwarding" checked />
+                      <span>Port Forwarding (-L / -R)</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                      <input type="checkbox" class="cert-extension-cb" value="permit-agent-forwarding" />
+                      <span>Agent Forwarding (-A)</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                      <input type="checkbox" class="cert-extension-cb" value="permit-user-rc" />
+                      <span>User RC (~/.ssh/rc)</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                      <input type="checkbox" class="cert-extension-cb" value="permit-X11-forwarding" />
+                      <span>X11 GUI Forwarding</span>
+                    </label>
+                  </div>
                 </div>
 
                 <div class="form-actions">
@@ -456,6 +494,7 @@
                     <button class="btn btn-secondary btn-sm" onclick="copySnippet('cert-ssh-cmd', true)">Copy</button>
                   </div>
                 </div>
+                <div id="cert-meta-details" class="mt-2" style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono, monospace);"></div>
               </div>
 
               <!-- Configuration: Default SSH Cert Lifetime -->

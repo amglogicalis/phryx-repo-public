@@ -825,10 +825,10 @@ Para iniciar este túnel en tu equipo:
   // SSH Register Form
   document.getElementById('caseshell-register-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const alias = document.getElementById('ssh-alias').value;
-    const host = document.getElementById('ssh-host').value;
-    const user = document.getElementById('ssh-user').value;
-    const port = Number(document.getElementById('ssh-port').value);
+    const alias = document.getElementById('ssh-alias').value.trim();
+    const host = document.getElementById('ssh-host').value.trim();
+    const user = document.getElementById('ssh-user').value.trim() || 'root';
+    const port = Number(document.getElementById('ssh-port').value) || 22;
 
     let setupSnippet = '';
 
@@ -859,7 +859,7 @@ Para iniciar este túnel en tu equipo:
 echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... phryx_ca@terra" | sudo tee /etc/ssh/phryx_ca.pub
 echo "TrustedUserCAKeys /etc/ssh/phryx_ca.pub" | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart ssh
-echo "✔ Ready for ephemeral 60-min Zero-Trust SSH!"`;
+echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     }
 
     renderServers();
@@ -882,12 +882,16 @@ echo "✔ Ready for ephemeral 60-min Zero-Trust SSH!"`;
       return;
     }
 
-    const principal = document.getElementById('cert-principal').value;
-    const duration = Number(document.getElementById('cert-duration').value);
-    const sourceIp = document.getElementById('cert-source-ip').value;
-    const forceCommand = document.getElementById('cert-force-command').value;
+    const principal = document.getElementById('cert-principal').value.trim() || state.ghUser || 'operator';
+    const duration = Number(document.getElementById('cert-duration').value) || Number(localStorage.getItem('phryx_default_ssh_lifetime')) || 60;
+    const keyId = document.getElementById('cert-key-id').value.trim() || undefined;
+    const sourceIp = document.getElementById('cert-source-ip').value.trim() || undefined;
+    const forceCommand = document.getElementById('cert-force-command').value.trim() || undefined;
+    const publicKey = document.getElementById('cert-public-key').value.trim() || undefined;
+    const extensions = Array.from(document.querySelectorAll('.cert-extension-cb:checked')).map((cb) => cb.value);
 
     let certData = null;
+    let sshCommand = null;
 
     if (state.isLocalServer) {
       const res = await fetch(`${state.apiBase}/api/ssh/cert`, {
@@ -899,26 +903,50 @@ echo "✔ Ready for ephemeral 60-min Zero-Trust SSH!"`;
           validityMinutes: duration,
           sourceAddress: sourceIp,
           forceCommand,
+          keyId,
+          publicKey,
+          extensions,
         }),
       });
       if (res.ok) {
         certData = await res.json();
+        sshCommand = certData.sshCommand;
       }
     } else {
       certData = {
         serial: `phryx_cert_${Date.now()}`,
+        keyId: keyId || `phryx-${principal}-${serverAlias}-${Date.now()}`,
         durationMinutes: duration,
         validBefore: new Date(Date.now() + duration * 60000).toISOString(),
+        extensions,
+        principals: [principal],
+        hasEphemeralPrivateKey: !publicKey,
       };
+      const s = state.servers.find((x) => x.alias === serverAlias);
+      const portFlag = s && s.port !== 22 ? ` -p ${s.port}` : '';
+      const u = s ? s.user : 'root';
+      const h = s ? s.host : serverAlias;
+      const cmdSuffix = forceCommand ? ` -- "${forceCommand}"` : '';
+      const keyFlag = publicKey ? '' : ` -i /tmp/${certData.serial}.key`;
+      sshCommand = `ssh${keyFlag}${portFlag} ${u}@${h}${cmdSuffix}`;
     }
 
     const resultBox = document.getElementById('cert-result-box');
     const cmdInput = document.getElementById('cert-ssh-cmd');
     const expiresTag = document.getElementById('cert-expires-tag');
+    const metaDetails = document.getElementById('cert-meta-details');
 
     if (resultBox && cmdInput) {
-      cmdInput.value = `phryx ssh ${serverAlias}`;
+      cmdInput.value = sshCommand || `phryx ssh ${serverAlias}`;
       if (expiresTag) expiresTag.textContent = `${duration}m lifetime`;
+      if (metaDetails && certData) {
+        metaDetails.innerHTML = `
+          <div><strong>Serial:</strong> ${certData.serial || 'N/A'} | <strong>Key ID:</strong> ${certData.keyId || 'Auto'}</div>
+          <div><strong>Principals:</strong> ${(certData.principals || [principal]).join(', ')} | <strong>Expires:</strong> ${new Date(certData.validBefore).toLocaleTimeString()}</div>
+          <div><strong>Extensions:</strong> ${(certData.extensions || extensions).join(', ')}</div>
+          <div><strong>Key Mode:</strong> ${certData.hasEphemeralPrivateKey ? '⚡ Ephemeral Keypair (Auto-generated)' : '🔑 Custom Client Public Key'}</div>
+        `;
+      }
       resultBox.classList.remove('hidden');
     }
   });
