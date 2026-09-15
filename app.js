@@ -6,8 +6,9 @@
 // State
 const state = {
   activeTab: 'dashboard',
-  apiBase: window.location.origin.includes('localhost') ? window.location.origin : '',
-  isLocalServer: window.location.origin.includes('localhost'),
+  apiBase: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? window.location.origin : '',
+  isLocalServer: (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'),
+  vaultRepo: localStorage.getItem('phryx_storage_repo') || 'amglogicalis/.phryx-storage',
   status: null,
   tunnels: [],
   servers: [],
@@ -110,6 +111,150 @@ function handleLogout() {
 }
 window.handleLogout = handleLogout;
 
+
+// ─── GITHUB VAULT CLIENT (ZERO-TRUST BIDIRECTIONAL REPO PERSISTENCE) ───────────
+const vaultClient = {
+  getRepo() {
+    return state.vaultRepo || (state.ghUser ? `${state.ghUser}/.phryx-storage` : 'amglogicalis/.phryx-storage');
+  },
+
+  async ensureVaultRepo() {
+    if (!state.ghToken) return false;
+    const repoFullName = this.getRepo();
+    try {
+      // Check if repo exists
+      const res = await fetch(`https://api.github.com/repos/${repoFullName}`, {
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+
+      if (res.ok) {
+        state.vaultRepo = repoFullName;
+        localStorage.setItem('phryx_storage_repo', repoFullName);
+        return true;
+      }
+
+      if (res.status === 404) {
+        // Create private repository automatically
+        const repoName = repoFullName.includes('/') ? repoFullName.split('/')[1] : repoFullName;
+        const createRes = await fetch('https://api.github.com/user/repos', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${state.ghToken}`,
+            Accept: 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: repoName,
+            private: true,
+            description: 'PHRYX — The Phantom Mesh: Zero-Trust Storage Vault',
+            auto_init: true,
+          }),
+        });
+
+        if (createRes.ok) {
+          state.vaultRepo = repoFullName;
+          localStorage.setItem('phryx_storage_repo', repoFullName);
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[VaultClient] Error checking/creating vault repo:', err);
+    }
+    return false;
+  },
+
+  async getFile(relPath) {
+    if (!state.ghToken) return null;
+    const repoFullName = this.getRepo();
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.content) {
+          const raw = decodeURIComponent(escape(atob(json.content.replace(/\s/g, ''))));
+          return JSON.parse(raw);
+        }
+      }
+    } catch (err) {
+      // Not found or network error
+    }
+    return null;
+  },
+
+  async setFile(relPath, data, commitMsg) {
+    if (!state.ghToken) return false;
+    const repoFullName = this.getRepo();
+    try {
+      // Check existing SHA
+      let sha = undefined;
+      try {
+        const checkRes = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+          headers: {
+            Authorization: `Bearer ${state.ghToken}`,
+            Accept: 'application/vnd.github.v3+json',
+          },
+        });
+        if (checkRes.ok) {
+          const cur = await checkRes.json();
+          sha = cur.sha;
+        }
+      } catch {}
+
+      const jsonStr = JSON.stringify(data, null, 2);
+      const contentBase64 = btoa(unescape(encodeURIComponent(jsonStr)));
+
+      const body = {
+        message: commitMsg || `phryx(web-console): update ${relPath}`,
+        content: contentBase64,
+      };
+      if (sha) body.sha = sha;
+
+      const putRes = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      return putRes.ok;
+    } catch (err) {
+      console.warn('[VaultClient] Error updating file in vault:', err);
+      return false;
+    }
+  },
+
+  async listFolder(relFolder) {
+    if (!state.ghToken) return [];
+    const repoFullName = this.getRepo();
+    try {
+      const res = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relFolder}`, {
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (res.ok) {
+        const items = await res.json();
+        if (Array.isArray(items)) {
+          return items.filter((it) => it.name && it.name.endsWith('.json')).map((it) => it.name);
+        }
+      }
+    } catch (err) {}
+    return [];
+  },
+};
+
 async function authenticate(token) {
   const btnConnect = document.getElementById('btn-connect');
   const loginError = document.getElementById('login-error');
@@ -145,6 +290,11 @@ async function authenticate(token) {
     sessionStorage.setItem('phryx_gh_user', userData.login);
     state.ghToken = token;
     state.ghUser = userData.login;
+    state.vaultRepo = `${userData.login}/.phryx-storage`;
+    localStorage.setItem('phryx_storage_repo', state.vaultRepo);
+
+    // Auto-create or verify .phryx-storage vault repo
+    await vaultClient.ensureVaultRepo();
 
     // Update UI profile
     if (userDisplay) userDisplay.textContent = `@${userData.login}`;
@@ -360,6 +510,24 @@ async function loadTunnels() {
     }
   } catch {}
 
+  // Fetch from GitHub Vault if online
+  if (state.ghToken) {
+    const files = await vaultClient.listFolder('tunnel-sessions');
+    if (files && files.length > 0) {
+      const loaded = [];
+      for (const f of files.slice(0, 20)) {
+        const item = await vaultClient.getFile(`tunnel-sessions/${f}`);
+        if (item) loaded.push(item);
+      }
+      if (loaded.length > 0) {
+        state.tunnels = loaded.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+        localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+        renderTunnels();
+        return;
+      }
+    }
+  }
+
   // Fallback to local storage
   const saved = localStorage.getItem('phryx_tunnels');
   state.tunnels = saved ? JSON.parse(saved) : [];
@@ -484,6 +652,17 @@ async function loadServers() {
     }
   } catch {}
 
+  // Fetch from GitHub Vault if online
+  if (state.ghToken) {
+    const vaultServersMap = await vaultClient.getFile('ssh/servers.json');
+    if (vaultServersMap && typeof vaultServersMap === 'object') {
+      state.servers = Object.values(vaultServersMap);
+      localStorage.setItem('phryx_servers', JSON.stringify(state.servers));
+      renderServers();
+      return;
+    }
+  }
+
   const saved = localStorage.getItem('phryx_servers');
   state.servers = saved ? JSON.parse(saved) : [];
   renderServers();
@@ -558,6 +737,24 @@ async function loadGeoHistory() {
     }
   } catch {}
 
+  // Fetch from GitHub Vault if online
+  if (state.ghToken) {
+    const files = await vaultClient.listFolder('geo/history');
+    if (files && files.length > 0) {
+      const loaded = [];
+      for (const f of files.slice(0, 15)) {
+        const item = await vaultClient.getFile(`geo/history/${f}`);
+        if (item) loaded.push(item);
+      }
+      if (loaded.length > 0) {
+        state.geoHistory = loaded.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        localStorage.setItem('phryx_geo_history', JSON.stringify(state.geoHistory));
+        renderGeoHistory();
+        return;
+      }
+    }
+  }
+
   const saved = localStorage.getItem('phryx_geo_history');
   state.geoHistory = saved ? JSON.parse(saved) : [];
   renderGeoHistory();
@@ -602,6 +799,27 @@ async function loadReach() {
       return;
     }
   } catch {}
+
+  // Fetch from GitHub Vault if online
+  if (state.ghToken) {
+    const [vaultProviders, vaultLogs, vaultRules] = await Promise.all([
+      vaultClient.getFile('reach/providers.json'),
+      vaultClient.getFile('reach/history.json'),
+      vaultClient.getFile('reach/rules.json'),
+    ]);
+    if (vaultProviders && typeof vaultProviders === 'object') {
+      state.reachProviders = Object.values(vaultProviders);
+      localStorage.setItem('phryx_reach_providers', JSON.stringify(state.reachProviders));
+    }
+    if (Array.isArray(vaultLogs)) {
+      state.reachLogs = vaultLogs;
+    }
+    if (vaultRules && typeof vaultRules === 'object') {
+      state.reachRules = Object.values(vaultRules);
+    }
+    renderReach();
+    return;
+  }
 
   const savedP = localStorage.getItem('phryx_reach_providers');
   state.reachProviders = savedP ? JSON.parse(savedP) : [];
@@ -653,6 +871,24 @@ async function loadGateways() {
       }
     }
   } catch {}
+
+  // Fetch from GitHub Vault if online
+  if (state.ghToken) {
+    const files = await vaultClient.listFolder('route-sessions');
+    if (files && files.length > 0) {
+      const loaded = [];
+      for (const f of files) {
+        const item = await vaultClient.getFile(`route-sessions/${f}`);
+        if (item) loaded.push(item);
+      }
+      if (loaded.length > 0) {
+        state.gateways = loaded.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+        localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+        renderGateways();
+        return;
+      }
+    }
+  }
 
   const saved = localStorage.getItem('phryx_gateways');
   state.gateways = saved ? JSON.parse(saved) : [];
@@ -871,6 +1107,11 @@ Para iniciar este túnel en tu equipo:
       };
       state.servers.push(server);
       localStorage.setItem('phryx_servers', JSON.stringify(state.servers));
+      if (state.ghToken) {
+        const map = {};
+        for (const s of state.servers) map[s.alias] = s;
+        vaultClient.setFile('ssh/servers.json', map, `phryx(ssh): register server ${alias}`);
+      }
 
       setupSnippet = `# Setup PHRYX Zero-Trust CA on server [${alias}] (${host})
 echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... phryx_ca@terra" | sudo tee /etc/ssh/phryx_ca.pub
@@ -965,6 +1206,19 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
         `;
       }
       resultBox.classList.remove('hidden');
+      if (state.ghToken && certData) {
+        const sessionRecord = {
+          sessionId: certData.serial,
+          serverAlias,
+          userPrincipal: principal,
+          startedAt: new Date().toISOString(),
+          durationMinutes: duration,
+          validBefore: certData.validBefore,
+          status: 'active',
+          keyId: certData.keyId,
+        };
+        vaultClient.setFile(`ssh/sessions/${certData.serial}.json`, sessionRecord, `phryx(ssh): record session ${certData.serial}`);
+      }
     }
   });
 
@@ -1019,6 +1273,9 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
       };
       state.geoHistory.unshift(matrix);
       localStorage.setItem('phryx_geo_history', JSON.stringify(state.geoHistory));
+      if (state.ghToken && matrix) {
+        vaultClient.setFile(`geo/history/${matrix.id}.json`, matrix, `phryx(geo): record matrix ${matrix.id}`);
+      }
     }
 
     if (btn) btn.disabled = false;
@@ -1075,6 +1332,11 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     const item = { provider, resourceId, port, protocol };
     state.reachProviders.push(item);
     localStorage.setItem('phryx_reach_providers', JSON.stringify(state.reachProviders));
+    if (state.ghToken) {
+      const map = {};
+      for (const p of state.reachProviders) map[`${p.provider}:${p.resourceId}`] = p;
+      vaultClient.setFile('reach/providers.json', map, `phryx(reach): configure provider ${item.provider}:${item.resourceId}`);
+    }
 
     renderReach();
     refreshStatus();
@@ -1166,6 +1428,9 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
       };
       state.gateways.unshift(session);
       localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+      if (state.ghToken) {
+        vaultClient.setFile(`route-sessions/${session.id}.json`, session, `phryx(route): save session ${session.id}`);
+      }
     }
 
     if (btn) {
