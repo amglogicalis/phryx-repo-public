@@ -391,8 +391,10 @@
                     <input type="number" id="ssh-port" class="form-control" placeholder="22" />
                   </div>
                 </div>
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary">➕ Register Server</button>
+                <div class="form-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                  <button type="submit" id="btn-register-server" class="btn btn-primary">➕ Register Server</button>
+                  <button type="button" id="btn-cancel-edit-server" class="btn btn-secondary hidden" onclick="cancelEditServer()">✕ Cancel</button>
+                  <input type="hidden" id="ssh-editing-alias" value="" />
                 </div>
               </form>
 
@@ -543,7 +545,7 @@
                     <th>Port</th>
                     <th>CA Fingerprint</th>
                     <th>Registered At</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-servers">

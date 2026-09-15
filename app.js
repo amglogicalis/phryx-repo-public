@@ -764,10 +764,12 @@ function renderServers() {
           <td>${s.host}</td>
           <td>${s.user}</td>
           <td>${s.port}</td>
-          <td><code>${s.caPublicKeyFingerprint}</code></td>
-          <td>${new Date(s.registeredAt).toLocaleDateString()}</td>
-          <td>
-            <button class="btn btn-primary btn-xs" onclick="quickMintCert('${s.alias}')">⚡ Mint Cert</button>
+          <td><code>${s.caPublicKeyFingerprint || '—'}</code></td>
+          <td>${s.registeredAt ? new Date(s.registeredAt).toLocaleDateString() : '—'}</td>
+          <td style="display:flex; gap:0.35rem; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-xs" onclick="quickMintCert('${s.alias}')">⚡ Mint</button>
+            <button class="btn btn-secondary btn-xs" onclick="editServer('${s.alias}')">✏️ Edit</button>
+            <button class="btn btn-danger btn-xs" onclick="deleteServer('${s.alias}')">🗑️ Delete</button>
           </td>
         </tr>
       `
@@ -775,6 +777,61 @@ function renderServers() {
         .join('');
     }
   }
+}
+
+// ── Edit server: populate form and switch to edit mode ───────────────────────
+function editServer(alias) {
+  const s = state.servers.find((x) => x.alias === alias);
+  if (!s) return;
+
+  document.getElementById('ssh-alias').value = s.alias;
+  document.getElementById('ssh-host').value = s.host;
+  document.getElementById('ssh-user').value = s.user;
+  document.getElementById('ssh-port').value = s.port;
+  document.getElementById('ssh-editing-alias').value = alias;
+
+  // Switch button labels
+  const btnReg = document.getElementById('btn-register-server');
+  const btnCancel = document.getElementById('btn-cancel-edit-server');
+  if (btnReg) btnReg.textContent = '💾 Update Server';
+  if (btnCancel) btnCancel.classList.remove('hidden');
+
+  // Scroll to form
+  document.getElementById('caseshell-register-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Cancel edit: reset form to register mode ─────────────────────────────────
+function cancelEditServer() {
+  document.getElementById('caseshell-register-form').reset();
+  document.getElementById('ssh-editing-alias').value = '';
+  const btnReg = document.getElementById('btn-register-server');
+  const btnCancel = document.getElementById('btn-cancel-edit-server');
+  if (btnReg) btnReg.textContent = '➕ Register Server';
+  if (btnCancel) btnCancel.classList.add('hidden');
+  document.getElementById('ssh-setup-box')?.classList.add('hidden');
+}
+
+// ── Delete server: remove from state + vault + localStorage ─────────────────
+async function deleteServer(alias) {
+  if (!confirm(`Delete server "${alias}"? This cannot be undone.`)) return;
+
+  state.servers = state.servers.filter((x) => x.alias !== alias);
+  localStorage.setItem('phryx_servers', JSON.stringify(state.servers));
+
+  if (state.ghToken) {
+    const map = {};
+    for (const s of state.servers) map[s.alias] = s;
+    await vaultClient.setFile('ssh/servers.json', map, `phryx(ssh): delete server ${alias}`);
+  }
+
+  if (state.isLocalServer) {
+    try {
+      await fetch(`${state.apiBase}/api/ssh/servers/${encodeURIComponent(alias)}`, { method: 'DELETE' });
+    } catch {}
+  }
+
+  renderServers();
+  refreshStatus();
 }
 
 async function quickMintCert(alias) {
@@ -1135,17 +1192,23 @@ Para iniciar este túnel en tu equipo:
     alert(`Copied to clipboard: ${cmd}`);
   });
 
-  // SSH Register Form
+  // SSH Register / Edit Server Form
   document.getElementById('caseshell-register-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const alias = document.getElementById('ssh-alias').value.trim();
     const host = document.getElementById('ssh-host').value.trim();
     const user = document.getElementById('ssh-user').value.trim() || 'root';
     const port = Number(document.getElementById('ssh-port').value) || 22;
+    const editingAlias = document.getElementById('ssh-editing-alias')?.value?.trim() || '';
+    const isEdit = !!editingAlias;
 
     let setupSnippet = '';
 
     if (state.isLocalServer) {
+      if (isEdit) {
+        // UPDATE via API: delete old, create new (or PUT if backend supports it)
+        try { await fetch(`${state.apiBase}/api/ssh/servers/${encodeURIComponent(editingAlias)}`, { method: 'DELETE' }); } catch {}
+      }
       const res = await fetch(`${state.apiBase}/api/ssh/servers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1154,23 +1217,56 @@ Para iniciar este túnel en tu equipo:
       if (res.ok) {
         const data = await res.json();
         setupSnippet = data.setupSnippet;
-        state.servers.push(data.server);
+        if (isEdit) {
+          // Replace old entry
+          const idx = state.servers.findIndex((x) => x.alias === editingAlias);
+          if (idx !== -1) state.servers.splice(idx, 1, data.server);
+          else state.servers.push(data.server);
+        } else {
+          state.servers.push(data.server);
+        }
       }
     } else {
-      const server = {
-        alias,
-        host,
-        user,
-        port,
-        registeredAt: new Date().toISOString(),
-        caPublicKeyFingerprint: 'ed25519_fingerprint_live',
-      };
-      state.servers.push(server);
+      // Alias conflict check (only for new servers)
+      if (!isEdit && state.servers.find((x) => x.alias === alias)) {
+        alert(`A server with alias "${alias}" already exists. Use ✏️ Edit to modify it.`);
+        return;
+      }
+
+      if (isEdit) {
+        // Update in-place, preserving registeredAt and fingerprint
+        const idx = state.servers.findIndex((x) => x.alias === editingAlias);
+        if (idx !== -1) {
+          const existing = state.servers[idx];
+          state.servers[idx] = {
+            ...existing,
+            alias,   // alias may have changed
+            host,
+            user,
+            port,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+      } else {
+        state.servers.push({
+          alias,
+          host,
+          user,
+          port,
+          registeredAt: new Date().toISOString(),
+          caPublicKeyFingerprint: 'ed25519_fingerprint_live',
+        });
+      }
+
       localStorage.setItem('phryx_servers', JSON.stringify(state.servers));
       if (state.ghToken) {
         const map = {};
         for (const s of state.servers) map[s.alias] = s;
-        vaultClient.setFile('ssh/servers.json', map, `phryx(ssh): register server ${alias}`);
+        vaultClient.setFile(
+          'ssh/servers.json',
+          map,
+          isEdit ? `phryx(ssh): update server ${alias}` : `phryx(ssh): register server ${alias}`,
+        );
       }
 
       setupSnippet = `# Setup PHRYX Zero-Trust CA on server [${alias}] (${host})
@@ -1180,14 +1276,19 @@ sudo systemctl restart ssh
 echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     }
 
+    // Reset form to register mode
+    cancelEditServer();
+
     renderServers();
     refreshStatus();
 
-    const box = document.getElementById('ssh-setup-box');
-    const code = document.getElementById('ssh-setup-code');
-    if (box && code) {
-      code.textContent = setupSnippet;
-      box.classList.remove('hidden');
+    if (setupSnippet) {
+      const box = document.getElementById('ssh-setup-box');
+      const code = document.getElementById('ssh-setup-code');
+      if (box && code) {
+        code.textContent = setupSnippet;
+        box.classList.remove('hidden');
+      }
     }
   });
 
