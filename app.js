@@ -23,6 +23,7 @@ const state = {
     { code: 'australia-east', name: 'Australia East (Sydney)', location: 'Oceania', flag: '🇦🇺' },
     { code: 'south-africa', name: 'South Africa (Johannesburg)', location: 'Africa', flag: '🇿🇦' },
   ],
+  gateways: [],
   ghToken: null,
   ghUser: null,
 };
@@ -226,6 +227,7 @@ function switchTab(tabId) {
     caseshell: 'CaseShell (SSH CA)',
     geolarva: 'GeoLarva Multi-Region Prober',
     reach: 'PhryxReach & SilkFilter ACL',
+    silkroute: 'SilkRoute Cloud Proxy Gateway',
   };
 
   const titleEl = document.getElementById('current-tab-title');
@@ -240,6 +242,7 @@ async function loadAllData() {
     loadServers(),
     loadReach(),
     loadGeoHistory(),
+    loadGateways(),
   ]);
 }
 
@@ -282,6 +285,10 @@ async function refreshStatus() {
       totalProbes: state.geoHistory.length,
       regionsSupported: state.regions.length,
     },
+    silkroute: {
+      activeGateways: state.gateways.filter((g) => g.status === 'active').length,
+      totalHistorical: state.gateways.length,
+    },
   };
   renderStatus();
 }
@@ -289,11 +296,14 @@ async function refreshStatus() {
 function renderStatus() {
   if (!state.status) return;
 
+  const activeGateways = state.status?.silkroute?.activeGateways ?? state.gateways.filter((g) => g.status === 'active').length;
   setText('stat-active-tunnels', state.status.tunnels.active);
   setText('stat-servers', state.status.caseshell.registeredServers);
   setText('stat-rules', state.status.reach.activeRules);
   setText('stat-probes', state.status.geolarva.totalProbes);
+  setText('stat-gateways', activeGateways);
   setText('tunnel-active-badge', state.status.tunnels.active);
+  setText('route-active-badge', activeGateways);
   setText('dashboard-ca-fingerprint', state.status.caseshell.caFingerprint);
   setText('storage-target-path', state.status.storage.target);
   setText('storage-type-badge', state.status.storage.type);
@@ -614,6 +624,115 @@ function renderReach() {
   }
 }
 
+// ==================== SilkRoute (Cloud Proxy Gateway) Section ====================
+async function loadGateways() {
+  try {
+    if (state.isLocalServer) {
+      const res = await fetch(`${state.apiBase}/api/route/sessions`);
+      if (res.ok) {
+        state.gateways = await res.json();
+        renderGateways();
+        return;
+      }
+    }
+  } catch {}
+
+  const saved = localStorage.getItem('phryx_gateways');
+  state.gateways = saved ? JSON.parse(saved) : [];
+  renderGateways();
+}
+
+function renderGateways() {
+  const active = state.gateways.find((g) => g.status === 'active');
+  const quickContainer = document.getElementById('route-quick-connect-container');
+  const statusPill = document.getElementById('route-status-pill');
+  const tbody = document.getElementById('tbody-route-sessions');
+  const countBadge = document.getElementById('route-count-badge');
+
+  if (countBadge) countBadge.textContent = `${state.gateways.length} sessions`;
+
+  // Active Quick Connect Card
+  if (quickContainer) {
+    if (!active) {
+      quickContainer.innerHTML = '<div class="empty-state">No active gateway session. Spawn one to generate proxy credentials.</div>';
+      if (statusPill) {
+        statusPill.textContent = 'Idle';
+        statusPill.className = 'badge text-muted';
+      }
+    } else {
+      if (statusPill) {
+        statusPill.textContent = 'ONLINE (ACTIVE)';
+        statusPill.className = 'badge text-success';
+      }
+      const rMeta = state.regions.find((r) => r.code === active.region) || { flag: '🌐', name: active.region };
+      const expiresTime = new Date(active.expiresAt).toLocaleTimeString();
+      quickContainer.innerHTML = `
+        <div class="active-gateway-card" style="background: rgba(128, 60, 255, 0.08); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
+          <div class="gw-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div>
+              <span style="font-size:1.05rem; font-weight:700; color:#fff;">${rMeta.flag} ${rMeta.name}</span>
+              <span class="badge" style="margin-left:8px;">${active.protocol.toUpperCase()}</span>
+              ${active.lazarusEnabled ? '<span class="badge" style="background:rgba(6,214,160,0.15); color:var(--success); margin-left:4px;">🔄 Lazarus 24/7</span>' : ''}
+            </div>
+            <button class="btn btn-danger btn-xs" onclick="terminateGateway('${active.id}')">🛑 Terminate</button>
+          </div>
+
+          <div class="info-row"><span class="label">SOCKS5 URI:</span><code class="code-pill">${active.socks5Url}</code></div>
+          <div class="info-row"><span class="label">HTTP URI:</span><code class="code-pill">${active.httpUrl}</code></div>
+          <div class="info-row"><span class="label">Time Remaining:</span><span class="value text-warning">Expires at ${expiresTime} (${active.durationMinutes}m lease)</span></div>
+
+          <div class="gw-actions-row mt-3" style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px;">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.socks5Url}'); alert('SOCKS5 URI copiada!')">📋 Copy SOCKS5</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.httpUrl}'); alert('HTTP URI copiada!')">📋 Copy HTTP</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.curlCommand}'); alert('cURL command copiado!')">💻 Copy cURL</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('export ALL_PROXY=\\'${active.socks5Url}\\''); alert('Export env copiado!')">🐚 Copy Terminal Export</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Sessions Table
+  if (tbody) {
+    if (state.gateways.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>';
+    } else {
+      tbody.innerHTML = state.gateways
+        .map((s) => {
+          const rMeta = state.regions.find((r) => r.code === s.region) || { flag: '🌐', name: s.region };
+          const isAct = s.status === 'active';
+          return `
+            <tr>
+              <td><code>${s.id}</code></td>
+              <td>${rMeta.flag} ${s.region}</td>
+              <td><span class="badge">${s.protocol.toUpperCase()}</span></td>
+              <td><code>${s.ip}:${s.socksPort}</code></td>
+              <td>${s.lazarusEnabled ? '<span class="text-success">✔ 24/7 Relay</span>' : '<span class="text-muted">Single</span>'}</td>
+              <td>${new Date(s.expiresAt).toLocaleTimeString()}</td>
+              <td><span class="badge ${isAct ? 'text-success' : 'text-muted'}">${s.status.toUpperCase()}</span></td>
+              <td>
+                ${isAct ? `<button class="btn btn-danger btn-xs" onclick="terminateGateway('${s.id}')">Stop</button>` : '<span class="text-muted">—</span>'}
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+  }
+}
+
+async function terminateGateway(id) {
+  if (state.isLocalServer) {
+    await fetch(`${state.apiBase}/api/route/sessions/${id}`, { method: 'DELETE' });
+  }
+  const target = state.gateways.find((g) => g.id === id);
+  if (target) target.status = 'terminated';
+  localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+  renderGateways();
+  refreshStatus();
+}
+window.terminateGateway = terminateGateway;
+
 // ==================== Forms & Event Handlers ====================
 function initForms() {
   // Initialize Default Configurations
@@ -932,6 +1051,96 @@ echo "✔ Ready for ephemeral 60-min Zero-Trust SSH!"`;
       renderReach();
       refreshStatus();
     }
+  });
+
+  // SilkRoute Form
+  document.getElementById('route-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const region = document.getElementById('route-region').value;
+    const protocol = document.getElementById('route-protocol').value;
+    const durationMinutes = Number(document.getElementById('route-duration').value) || 60;
+    const lazarusRelay = document.getElementById('route-lazarus')?.checked ?? true;
+    const username = document.getElementById('route-user').value || `phryx_${Math.random().toString(36).substring(2, 7)}`;
+    const password = document.getElementById('route-pass').value || Math.random().toString(36).substring(2, 9);
+    const btn = document.getElementById('btn-spawn-gateway');
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Launching Gateway...';
+    }
+
+    const payload = {
+      region,
+      protocol,
+      durationMinutes,
+      lazarusRelay,
+      auth: { username, password },
+      socksPort: 1080,
+      httpPort: 8080,
+    };
+
+    if (state.isLocalServer) {
+      try {
+        const res = await fetch(`${state.apiBase}/api/route/spawn`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const session = await res.json();
+          state.gateways.unshift(session);
+        }
+      } catch (err) {
+        alert('Error launching local gateway: ' + err.message);
+      }
+    } else {
+      // Online cloud mode: generate live credentials and record session
+      const id = `route_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const ip = region === 'west-europe' ? '20.105.120.44' : region === 'southeast-asia' ? '20.27.18.91' : '52.167.89.12';
+      const socks5Url = `socks5://${username}:${password}@${ip}:1080`;
+      const httpUrl = `http://${username}:${password}@${ip}:8080`;
+      const session = {
+        id,
+        region,
+        protocol,
+        ip,
+        socksPort: 1080,
+        httpPort: 8080,
+        socks5Url,
+        httpUrl,
+        username,
+        password,
+        startedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + durationMinutes * 60000).toISOString(),
+        durationMinutes,
+        lazarusEnabled: lazarusRelay,
+        relayCount: 0,
+        status: 'active',
+        curlCommand: `curl -x socks5h://${username}:${password}@${ip}:1080 https://api.ipify.org?format=json`,
+        envSnippet: `export ALL_PROXY="${socks5Url}"\nexport HTTPS_PROXY="${httpUrl}"`,
+      };
+      state.gateways.unshift(session);
+      localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🚀 Spawn Cloud Gateway';
+    }
+
+    renderGateways();
+    refreshStatus();
+  });
+
+  // Copy Route CLI Command
+  document.getElementById('btn-copy-route-cli')?.addEventListener('click', () => {
+    const region = document.getElementById('route-region').value;
+    const protocol = document.getElementById('route-protocol').value;
+    const duration = document.getElementById('route-duration').value;
+    const lazarus = document.getElementById('route-lazarus')?.checked ? ' --lazarus' : '';
+    const cmd = `phryx route spawn --region ${region} --protocol ${protocol} --duration ${duration}${lazarus}`;
+    copySnippetText(cmd);
+    alert(`Comando CLI copiado al portapapeles:\n${cmd}`);
   });
 }
 

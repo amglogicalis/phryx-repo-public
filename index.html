@@ -82,6 +82,11 @@
           <span class="icon">🔗</span>
           <span class="label">SilkFilter ACL</span>
         </button>
+        <button class="nav-item" data-tab="silkroute">
+          <span class="icon">🛸</span>
+          <span class="label">SilkRoute Proxy</span>
+          <span class="badge" id="route-active-badge">0</span>
+        </button>
       </nav>
 
       <div class="sidebar-footer">
@@ -150,6 +155,10 @@
             <div class="stat-card">
               <span class="stat-value" id="stat-probes">0</span>
               <span class="stat-label">Global Probes</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-value" id="stat-gateways">0</span>
+              <span class="stat-label">Proxy Gateways</span>
             </div>
           </div>
         </div>
@@ -676,6 +685,132 @@
                 </thead>
                 <tbody id="tbody-reach-logs">
                   <tr><td colspan="6" class="text-center text-muted">No ACL operations logged yet.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: SILKROUTE (CLOUD PROXY GATEWAY) -->
+      <section class="tab-pane" id="pane-silkroute">
+        <div class="page-intro">
+          <div>
+            <h2>SilkRoute — Ephemeral Cloud Proxy Gateway</h2>
+            <p>Deploy on-demand SOCKS5 and HTTP/HTTPS outbound proxies on global cloud runners. Up to 6 hours continuous lifetime with Lazarus 24/7 auto-relay.</p>
+          </div>
+        </div>
+
+        <div class="grid-2-cols">
+          <!-- Gateway Launcher Form -->
+          <div class="card">
+            <div class="card-header">
+              <h3><span class="icon">🛸</span> Spawn Ephemeral Gateway</h3>
+            </div>
+            <div class="card-body">
+              <form id="route-form" class="form-vertical">
+                <div class="form-group">
+                  <label for="route-region">Target Exit Region</label>
+                  <select id="route-region" class="form-control">
+                    <option value="west-europe">🇳🇱 Western Europe (Amsterdam)</option>
+                    <option value="east-us">🇺🇸 US East (Virginia)</option>
+                    <option value="southeast-asia">🇯🇵 Southeast Asia (Tokyo)</option>
+                    <option value="brazil-south">🇧🇷 Brazil South (São Paulo)</option>
+                    <option value="australia-east">🇦🇺 Australia East (Sydney)</option>
+                    <option value="south-africa">🇿🇦 South Africa (Johannesburg)</option>
+                  </select>
+                  <span class="help-text">Egress IP will be provisioned in the chosen geographic cloud datacenter.</span>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="route-protocol">Proxy Protocol</label>
+                    <select id="route-protocol" class="form-control">
+                      <option value="dual">Dual (SOCKS5 + HTTP)</option>
+                      <option value="socks5">SOCKS5 Only (Port 1080)</option>
+                      <option value="http">HTTP CONNECT (Port 8080)</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="route-duration">Duration (Minutes)</label>
+                    <input type="number" id="route-duration" class="form-control" value="60" min="15" max="360" />
+                    <span class="help-text">Max 360m (6 hours) per runner.</span>
+                  </div>
+                </div>
+
+                <!-- Lazarus Relay 24/7 Option -->
+                <div class="form-group" style="background: rgba(128, 60, 255, 0.08); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                  <label class="checkbox-label" style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0;">
+                    <input type="checkbox" id="route-lazarus" checked style="width: 18px; height: 18px; accent-color: var(--primary-brand);" />
+                    <div>
+                      <span style="font-weight: 600; color: var(--text-primary); font-size: 0.88rem;">🔄 Lazarus Relay (24/7 Continuous Handover)</span>
+                      <span class="help-text" style="display: block; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">
+                        Before runner reaches 6h timeout, automatically dispatches next cycle keeping proxy alive indefinitely.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="route-user">Username (Optional)</label>
+                    <input type="text" id="route-user" class="form-control" placeholder="auto-generated" />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="route-pass">Password (Optional)</label>
+                    <input type="text" id="route-pass" class="form-control" placeholder="auto-generated" />
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button type="submit" class="btn btn-primary" id="btn-spawn-gateway">
+                    🚀 Spawn Cloud Gateway
+                  </button>
+                  <button type="button" class="btn btn-secondary" id="btn-copy-route-cli">
+                    📋 Copy CLI Command
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Active Gateway Quick Connect Card -->
+          <div class="card">
+            <div class="card-header">
+              <h3><span class="icon">⚡</span> Quick Connect & Status</h3>
+              <span class="badge" id="route-status-pill">Ready</span>
+            </div>
+            <div class="card-body">
+              <div id="route-quick-connect-container">
+                <div class="empty-state">No active gateway session. Spawn one to generate proxy credentials.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Historical and Active Gateways Table -->
+        <div class="card mt-4">
+          <div class="card-header">
+            <h3><span class="icon">🛸</span> SilkRoute Session Ledger</h3>
+            <span class="badge" id="route-count-badge">0 sessions</span>
+          </div>
+          <div class="card-body">
+            <div class="table-wrapper">
+              <table class="data-table" id="table-route-sessions">
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>Region</th>
+                    <th>Protocol</th>
+                    <th>Proxy Endpoint</th>
+                    <th>Lazarus 24/7</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-route-sessions">
+                  <tr><td colspan="8" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>
                 </tbody>
               </table>
             </div>
