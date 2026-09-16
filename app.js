@@ -1589,7 +1589,338 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     }
   });
 
-  // GeoLarva Probe Form — REAL browser fetch() with Performance API
+  // ── GeoLarva: GitHub Actions workflow bootstrap ───────────────────────────
+  // Called once to ensure the workflow YAML exists in the vault repo.
+  async function ensureGeoWorkflow() {
+    const vault = vaultClient.getRepo();
+    const workflowPath = '.github/workflows/geolarva-probe.yml';
+
+    // Check if already exists
+    const existing = await vaultClient.getRawFile(workflowPath);
+    if (existing && existing.includes('geolarva-probe')) return { ok: true, created: false };
+
+    // Build the YAML — no template literals so ${{ }} expressions are safe
+    const GHA = (expr) => '${{ ' + expr + ' }}';
+    const lines = [
+      'name: "🌍 GeoLarva — Multi-Region Probe"',
+      '',
+      'on:',
+      '  workflow_dispatch:',
+      '    inputs:',
+      '      target_url:',
+      "        description: 'Target URL to probe'",
+      '        required: true',
+      '      method:',
+      "        description: 'HTTP method (GET HEAD POST OPTIONS)'",
+      '        required: false',
+      "        default: 'GET'",
+      '      timeout_s:',
+      "        description: 'Timeout in seconds'",
+      '        required: false',
+      "        default: '8'",
+      '      probe_run_id:',
+      "        description: 'Unique probe run ID (used to correlate results in vault)'",
+      '        required: true',
+      '      alert_threshold:',
+      "        description: 'Alert threshold ms'",
+      '        required: false',
+      "        default: '500'",
+      '      regions:',
+      "        description: 'Comma-separated region codes, or \"all\"'",
+      '        required: false',
+      "        default: 'all'",
+      '',
+      'permissions:',
+      '  contents: write',
+      '',
+      'jobs:',
+      '  probe:',
+      '    name: "' + GHA('matrix.region') + '"',
+      '    strategy:',
+      '      fail-fast: false',
+      '      matrix:',
+      '        include:',
+      '          - region: east-us',
+      '            flag: "🇺🇸"',
+      '            region_name: "US East (Virginia)"',
+      '          - region: west-europe',
+      '            flag: "🇳🇱"',
+      '            region_name: "West Europe (Amsterdam)"',
+      '          - region: southeast-asia',
+      '            flag: "🇯🇵"',
+      '            region_name: "Southeast Asia (Tokyo)"',
+      '          - region: brazil-south',
+      '            flag: "🇧🇷"',
+      '            region_name: "Brazil South (São Paulo)"',
+      '          - region: australia-east',
+      '            flag: "🇦🇺"',
+      '            region_name: "Australia East (Sydney)"',
+      '          - region: south-africa',
+      '            flag: "🇿🇦"',
+      '            region_name: "South Africa (Johannesburg)"',
+      '    runs-on: ubuntu-latest',
+      '    steps:',
+      '      - name: "' + GHA('matrix.flag') + ' Probe ' + GHA('matrix.region_name') + '"',
+      '        id: probe',
+      '        run: |',
+      '          TARGET="' + GHA('github.event.inputs.target_url') + '"',
+      '          METHOD="' + GHA('github.event.inputs.method') + '"',
+      '          TIMEOUT="' + GHA('github.event.inputs.timeout_s') + '"',
+      '          REGION="' + GHA('matrix.region') + '"',
+      '          REGION_NAME="' + GHA('matrix.region_name') + '"',
+      '          FLAG="' + GHA('matrix.flag') + '"',
+      '          PROBE_RUN_ID="' + GHA('github.event.inputs.probe_run_id') + '"',
+      '          ALERT_MS="' + GHA('github.event.inputs.alert_threshold') + '"',
+      '',
+      '          START_MS=$(date +%s%3N)',
+      '          # Measure TTFB with curl timing vars',
+      '          HTTP_INFO=$(curl -s -o /tmp/probe_body.txt \\',
+      '            -w "%{http_code}|%{time_namelookup}|%{time_connect}|%{time_starttransfer}|%{time_total}|%{size_download}" \\',
+      '            -X "$METHOD" \\',
+      '            -H "X-Phryx-Region: $REGION" \\',
+      '            -H "X-Phryx-Probe-Run: $PROBE_RUN_ID" \\',
+      '            -H "User-Agent: PHRYX-GeoLarva/2.0 (Actions)" \\',
+      '            --max-time "$TIMEOUT" \\',
+      '            --connect-timeout 5 \\',
+      '            "$TARGET" 2>/dev/null || echo "000|0|0|0|0|0")',
+      '          END_MS=$(date +%s%3N)',
+      '',
+      '          HTTP_CODE=$(echo "$HTTP_INFO" | cut -d"|" -f1)',
+      '          DNS_SEC=$(echo "$HTTP_INFO" | cut -d"|" -f2)',
+      '          CONNECT_SEC=$(echo "$HTTP_INFO" | cut -d"|" -f3)',
+      '          TTFB_SEC=$(echo "$HTTP_INFO" | cut -d"|" -f4)',
+      '          TOTAL_SEC=$(echo "$HTTP_INFO" | cut -d"|" -f5)',
+      '          SIZE_BYTES=$(echo "$HTTP_INFO" | cut -d"|" -f6)',
+      '',
+      '          LATENCY_MS=$((END_MS - START_MS))',
+      '          DNS_MS=$(echo "$DNS_SEC * 1000" | bc | cut -d"." -f1)',
+      '          TTFB_MS=$(echo "$TTFB_SEC * 1000" | bc | cut -d"." -f1)',
+      '          CONNECT_MS=$(echo "$CONNECT_SEC * 1000" | bc | cut -d"." -f1)',
+      '',
+      '          [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ] && SUCCESS=true || SUCCESS=false',
+      '          [ "$HTTP_CODE" = "000" ] && SUCCESS=false && HTTP_CODE=0',
+      '',
+      '          RUNNER_IP=$(curl -s https://api.ipify.org 2>/dev/null || echo "unknown")',
+      '',
+      '          echo "Region: $REGION_NAME | HTTP $HTTP_CODE | Latency: ${LATENCY_MS}ms | TTFB: ${TTFB_MS}ms | Runner IP: $RUNNER_IP"',
+      '',
+      '          # Build JSON result',
+      '          JSON=\'{\'',
+      '          JSON="$JSON\\"region\\":\\"$REGION\\","',
+      '          JSON="$JSON\\"regionName\\":\\"$REGION_NAME\\","',
+      '          JSON="$JSON\\"flag\\":\\"$FLAG\\","',
+      '          JSON="$JSON\\"status\\":$HTTP_CODE,"',
+      '          JSON="$JSON\\"latencyMs\\":$LATENCY_MS,"',
+      '          JSON="$JSON\\"ttfbMs\\":$TTFB_MS,"',
+      '          JSON="$JSON\\"dnsLookupMs\\":$DNS_MS,"',
+      '          JSON="$JSON\\"connectMs\\":$CONNECT_MS,"',
+      '          JSON="$JSON\\"contentLength\\":$SIZE_BYTES,"',
+      '          JSON="$JSON\\"success\\":$SUCCESS,"',
+      '          JSON="$JSON\\"runnerIp\\":\\"$RUNNER_IP\\","',
+      '          JSON="$JSON\\"probeRunId\\":\\"$PROBE_RUN_ID\\","',
+      '          JSON="$JSON\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\""',
+      "          JSON=\"$JSON'}'\"",
+      '',
+      '          # Write result to vault repo via GitHub API',
+      '          FILE_PATH="geo/runs/$PROBE_RUN_ID/$REGION.json"',
+      '          CONTENT_B64=$(echo "$JSON" | base64 -w 0)',
+      '',
+      '          curl -s -X PUT \\',
+      '            -H "Authorization: token ' + GHA('secrets.GITHUB_TOKEN') + '" \\',
+      '            -H "Accept: application/vnd.github.v3+json" \\',
+      '            -H "Content-Type: application/json" \\',
+      '            "https://api.github.com/repos/' + GHA('github.repository') + '/contents/$FILE_PATH" \\',
+      '            -d "{\\"message\\":\\"phryx(geo): $FLAG $REGION_NAME — $PROBE_RUN_ID\\",\\"content\\":\\"$CONTENT_B64\\"}" \\',
+      '            > /tmp/api_resp.json',
+      '',
+      '          cat /tmp/api_resp.json | python3 -c "import sys,json; r=json.load(sys.stdin); print(\'✅ Committed:\', r.get(\'content\',{}).get(\'html_url\',\'ok\'))" 2>/dev/null || cat /tmp/api_resp.json',
+    ];
+    const yamlContent = lines.join('\n');
+    const ok = await vaultClient.setRawFile(workflowPath, yamlContent, 'phryx(geo): add GeoLarva GitHub Actions workflow');
+    return { ok, created: true };
+  }
+
+  // ── GeoLarva: Run via GitHub Actions — real curl from GH infrastructure ──
+  async function runGeoViaActions({ url, method, timeoutMs, repetitions, alertThreshold, targetRegions, container, statusTag, btn }) {
+    const REGION_META_ACT = {
+      'east-us':        { flag: '🇺🇸', name: 'US East (Virginia)',         weight: 1.25 },
+      'west-europe':    { flag: '🇳🇱', name: 'West Europe (Amsterdam)',     weight: 1.0  },
+      'southeast-asia': { flag: '🇯🇵', name: 'Southeast Asia (Tokyo)',      weight: 2.1  },
+      'brazil-south':   { flag: '🇧🇷', name: 'Brazil South (São Paulo)',    weight: 2.4  },
+      'australia-east': { flag: '🇦🇺', name: 'Australia East (Sydney)',     weight: 2.7  },
+      'south-africa':   { flag: '🇿🇦', name: 'South Africa (Johannesburg)', weight: 2.9  },
+    };
+
+    const probeRunId = 'pr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const vault = vaultClient.getRepo();
+    const timeoutSec = Math.max(1, Math.round(timeoutMs / 1000));
+
+    // Step 1: Ensure workflow exists
+    if (statusTag) statusTag.textContent = '⚙️ Bootstrapping workflow…';
+    if (container) container.innerHTML = '<div class="empty-state">⚙️ Checking GeoLarva workflow in vault repo…</div>';
+
+    const bootstrap = await ensureGeoWorkflow();
+    if (!bootstrap.ok) {
+      if (statusTag) statusTag.textContent = '❌ Could not create workflow in vault repo';
+      if (container) container.innerHTML = '<div class="empty-state" style="color:#ef4444">❌ Failed to bootstrap geolarva-probe.yml in vault. Check PAT permissions (repo scope required).</div>';
+      return null;
+    }
+
+    if (bootstrap.created) {
+      // Small delay so GH can index the new workflow file
+      if (statusTag) statusTag.textContent = '⏳ Workflow created — waiting for GitHub to index it (8s)…';
+      await new Promise(r => setTimeout(r, 8000));
+    }
+
+    // Step 2: Dispatch workflow_dispatch
+    if (statusTag) statusTag.textContent = '🚀 Dispatching GitHub Actions workflow…';
+    const dispatchRes = await fetch(
+      'https://api.github.com/repos/' + vault + '/actions/workflows/geolarva-probe.yml/dispatches',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: 'token ' + state.ghToken,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ref: 'main',
+          inputs: {
+            target_url: url,
+            method: method,
+            timeout_s: String(timeoutSec),
+            probe_run_id: probeRunId,
+            alert_threshold: String(alertThreshold),
+            regions: targetRegions.join(','),
+          },
+        }),
+      }
+    );
+
+    if (!dispatchRes.ok && dispatchRes.status !== 204) {
+      const errText = await dispatchRes.text();
+      if (statusTag) statusTag.textContent = '❌ Dispatch failed (' + dispatchRes.status + ')';
+      if (container) container.innerHTML = '<div class="empty-state" style="color:#ef4444">❌ GitHub Actions dispatch failed: ' + dispatchRes.status + '<br><code>' + errText.slice(0, 200) + '</code></div>';
+      return null;
+    }
+
+    // Step 3: Find the workflow run (poll runs API for up to 30s to get the run URL)
+    let runUrl = null;
+    let runId = null;
+    const dispatchedAt = new Date().toISOString();
+
+    // Show waiting UI with per-region pending rows
+    if (container) {
+      container.innerHTML = '<div class="probe-bars-list" id="geo-live-progress">' +
+        targetRegions.map(r => {
+          const m = REGION_META_ACT[r] || { flag: '🌐', name: r };
+          return '<div class="probe-bar-row" id="geo-row-' + r + '">' +
+            '<div class="probe-bar-label">' + m.flag + ' ' + m.name + '</div>' +
+            '<div class="probe-bar-track"><div class="probe-bar-fill animated-pulse" style="width:100%;"></div></div>' +
+            '<div class="probe-bar-val"><span id="geo-dot-' + r + '" style="color:var(--text-muted);font-size:0.75rem;">⏳</span></div>' +
+          '</div>';
+        }).join('') +
+      '</div>' +
+      '<div id="geo-actions-link" style="margin-top:0.75rem;font-size:0.8rem;color:var(--text-muted);">Waiting for GitHub Actions runner to start…</div>';
+    }
+
+    // Poll for run ID (up to 30s, every 3s)
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await new Promise(r => setTimeout(r, 3000));
+      if (statusTag) statusTag.textContent = '🔍 Locating workflow run (' + (attempt + 1) + '/10)…';
+      try {
+        const runsRes = await fetch(
+          'https://api.github.com/repos/' + vault + '/actions/runs?event=workflow_dispatch&per_page=5',
+          { headers: { Authorization: 'token ' + state.ghToken, Accept: 'application/vnd.github.v3+json' } }
+        );
+        if (runsRes.ok) {
+          const runsData = await runsRes.json();
+          const run = (runsData.workflow_runs || []).find(r =>
+            r.name && r.name.includes('GeoLarva') &&
+            new Date(r.created_at) >= new Date(Date.now() - 120000)
+          );
+          if (run) {
+            runUrl = run.html_url;
+            runId = run.id;
+            const linkDiv = document.getElementById('geo-actions-link');
+            if (linkDiv) linkDiv.innerHTML = '🔗 <a href="' + runUrl + '" target="_blank" style="color:#a87ffb">View live run on GitHub Actions ↗</a> &nbsp; <span style="opacity:0.5;font-size:0.75rem;">Run #' + runId + ' · probe_run_id: ' + probeRunId + '</span>';
+            break;
+          }
+        }
+      } catch {}
+    }
+
+    if (statusTag) statusTag.textContent = '⏳ Waiting for runners to execute probes…';
+
+    // Step 4: Poll vault for result files until all regions complete (max 5 min)
+    const results = {};
+    const maxWaitMs = 5 * 60 * 1000;
+    const pollStart = Date.now();
+    const pollIntervalMs = 6000;
+
+    while (Date.now() - pollStart < maxWaitMs) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+      const elapsed = Math.round((Date.now() - pollStart) / 1000);
+      const done = Object.keys(results).length;
+      if (statusTag) statusTag.textContent = '⏳ Runners probing… ' + done + '/' + targetRegions.length + ' done (' + elapsed + 's elapsed)';
+
+      // Try to read each region result file from vault
+      for (const regionCode of targetRegions) {
+        if (results[regionCode]) continue; // already got this one
+
+        try {
+          const filePath = 'geo/runs/' + probeRunId + '/' + regionCode + '.json';
+          const data = await vaultClient.getFile(filePath);
+          if (data && data.probeRunId === probeRunId) {
+            results[regionCode] = data;
+            // Update UI row
+            const row = document.getElementById('geo-row-' + regionCode);
+            const dot = document.getElementById('geo-dot-' + regionCode);
+            if (dot) dot.textContent = '✅ ' + data.latencyMs + 'ms';
+            if (row) {
+              const fill = row.querySelector('.probe-bar-fill');
+              if (fill) fill.classList.remove('animated-pulse');
+            }
+          }
+        } catch {}
+      }
+
+      if (Object.keys(results).length === targetRegions.length) break;
+    }
+
+    // Step 5: Build matrix from real results
+    const probeResults = targetRegions.map(r => results[r]).filter(Boolean);
+
+    if (probeResults.length === 0) {
+      if (statusTag) statusTag.textContent = '❌ No probe results received (timeout)';
+      if (container) container.innerHTML += '<div style="color:#ef4444;padding:0.75rem">❌ No results arrived within 5 minutes. Check the <a href="' + (runUrl || 'https://github.com/' + vault + '/actions') + '" target="_blank" style="color:#a87ffb">Actions run</a> for errors.</div>';
+      return null;
+    }
+
+    const successful = probeResults.filter(r => r.success);
+    const sorted = [...probeResults].sort((a, b) => a.latencyMs - b.latencyMs);
+    const avgLatencyMs = Math.round(probeResults.reduce((s, r) => s + r.latencyMs, 0) / probeResults.length);
+
+    const matrix = {
+      id: 'geo_mat_' + Date.now() + '_' + probeRunId,
+      url, timestamp: new Date().toISOString(),
+      method, repetitions: 1, timeoutMs, alertThreshold,
+      probeRunId,
+      runUrl,
+      executionMode: 'github-actions',
+      probes: probeResults,
+      summary: {
+        fastestRegion: sorted[0]?.region || 'N/A',
+        slowestRegion: sorted[sorted.length - 1]?.region || 'N/A',
+        avgLatencyMs,
+        globalSuccessRate: Math.round((successful.length / probeResults.length) * 100),
+      },
+    };
+
+    return matrix;
+  }
+
+  // GeoLarva Probe Form — GitHub Actions (real curl, multi-region) or browser fetch fallback
   document.getElementById('geo-probe-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const url = document.getElementById('geo-url').value.trim();
@@ -1745,7 +2076,7 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
         .join('');
     }
 
-    // ── Execute probes in parallel per region ────────────────────────────────
+    // ── Execute probes ────────────────────────────────────────────────────────
     let matrix = null;
 
     if (state.isLocalServer) {
@@ -1762,41 +2093,62 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
             id: `geo_${Date.now()}`, url, timestamp: new Date().toISOString(),
             probes: [data],
             summary: { fastestRegion: region, slowestRegion: region, avgLatencyMs: data.latencyMs, globalSuccessRate: data.success ? 100 : 0 },
-            method, repetitions,
+            method, repetitions, executionMode: 'local-api',
           };
         }
       } catch {}
     }
 
-    if (!matrix) {
-      // Browser fetch() real probe path
-      const probeResults = await Promise.all(targetRegions.map((r) => runRegionWithReps(r)));
+    // ── GITHUB ACTIONS MODE — real curl from GitHub infrastructure ────────────
+    if (!matrix && state.ghToken && !state.isLocalServer) {
+      matrix = await runGeoViaActions({
+        url, method, timeoutMs, repetitions, alertThreshold, targetRegions,
+        container, statusTag, btn,
+      });
+    }
 
+    // ── BROWSER FETCH FALLBACK ────────────────────────────────────────────────
+    if (!matrix) {
+      // Show live progress bars
+      const liveDiv = document.getElementById('geo-live-progress') || (() => {
+        if (container) container.innerHTML = '<div class="probe-bars-list" id="geo-live-progress"></div>';
+        return document.getElementById('geo-live-progress');
+      })();
+      if (liveDiv) {
+        liveDiv.innerHTML = targetRegions
+          .map((r) => {
+            const m = REGION_META[r];
+            return `<div class="probe-bar-row" id="geo-row-${r}">
+              <div class="probe-bar-label">${m.flag} ${m.name}</div>
+              <div class="probe-bar-track"><div class="probe-bar-fill animated-pulse" style="width:100%;"></div></div>
+              <div class="probe-bar-val"><span id="geo-dot-${r}" style="color:var(--text-muted);font-size:0.75rem;">0/${repetitions}</span></div>
+            </div>`;
+          })
+          .join('');
+      }
+
+      const probeResults = await Promise.all(targetRegions.map((r) => runRegionWithReps(r)));
       const successful = probeResults.filter((r) => r.success);
       const sorted = [...probeResults].sort((a, b) => a.latencyMs - b.latencyMs);
-      const fastest = sorted[0];
-      const slowest = sorted[sorted.length - 1];
       const avgLatencyMs = Math.round(probeResults.reduce((s, r) => s + r.latencyMs, 0) / probeResults.length);
 
       matrix = {
         id: `geo_mat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        url,
-        timestamp: new Date().toISOString(),
-        method,
-        repetitions,
-        timeoutMs,
-        alertThreshold,
-        corsMode,
+        url, timestamp: new Date().toISOString(),
+        method, repetitions, timeoutMs, alertThreshold, corsMode,
+        executionMode: 'browser-fetch',
         probes: probeResults,
         summary: {
-          fastestRegion: fastest?.region || 'N/A',
-          slowestRegion: slowest?.region || 'N/A',
+          fastestRegion: sorted[0]?.region || 'N/A',
+          slowestRegion: sorted[sorted.length - 1]?.region || 'N/A',
           avgLatencyMs,
           globalSuccessRate: Math.round((successful.length / probeResults.length) * 100),
         },
       };
+    }
 
-      // Persist to vault + localStorage
+    // ── Persist + update UI ───────────────────────────────────────────────────
+    if (matrix) {
       state.geoHistory.unshift(matrix);
       localStorage.setItem('phryx_geo_history', JSON.stringify(state.geoHistory.slice(0, 50)));
       if (state.ghToken) {
@@ -1805,14 +2157,20 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     }
 
     if (btn) { btn.disabled = false; btn.textContent = '⚡ Probe Now'; }
-    if (statusTag) {
+    if (statusTag && matrix) {
       const rate = matrix.summary.globalSuccessRate;
-      statusTag.textContent = `${rate === 100 ? '✅' : rate > 0 ? '⚠️' : '❌'} ${rate}% OK — ${matrix.summary.avgLatencyMs}ms avg`;
+      const modeLabel = matrix.executionMode === 'github-actions' ? ' 🤖 GH Actions' : matrix.executionMode === 'local-api' ? ' 🖥 Local API' : ' 🌐 Browser';
+      statusTag.textContent = `${rate === 100 ? '✅' : rate > 0 ? '⚠️' : '❌'} ${rate}% OK — ${matrix.summary.avgLatencyMs}ms avg${modeLabel}`;
+    }
+    if (!matrix) {
+      if (btn) btn.disabled = false;
+      return;
     }
 
     // ── Render probe result cards ─────────────────────────────────────────────
     if (container && matrix) {
       const maxLat = Math.max(...matrix.probes.map((p) => p.latencyMs), 1);
+      const isActionsMode = matrix.executionMode === 'github-actions';
 
       const latColor = (ms) => {
         if (ms <= alertThreshold * 0.5) return 'var(--color-success, #22c55e)';
@@ -1826,12 +2184,28 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
         return `<span style="color:#f59e0b;font-weight:600;">${p.status}</span>`;
       };
 
+      const modeBadge = isActionsMode
+        ? '<span style="background:#1a3a2a;color:#22c55e;border:1px solid #22c55e44;border-radius:4px;padding:2px 8px;font-size:0.7rem;font-weight:700;">🤖 GitHub Actions — real curl</span>'
+        : '<span style="background:#1a1a3a;color:#a87ffb;border:1px solid #a87ffb44;border-radius:4px;padding:2px 8px;font-size:0.7rem;font-weight:700;">🌐 Browser fetch (CORS)</span>';
+
+      const existingLink = document.getElementById('geo-actions-link');
+      const runLinkHtml = isActionsMode && matrix.runUrl
+        ? `<span>🔗 <a href="${matrix.runUrl}" target="_blank" style="color:#a87ffb">View Actions run ↗</a></span>`
+        : '';
+
       container.innerHTML = `
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+          ${modeBadge}
+          ${runLinkHtml}
+        </div>
         <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:0.75rem; margin-bottom:1rem;">
           ${matrix.probes.map((p) => {
             const widthPct = Math.round((p.latencyMs / maxLat) * 100);
             const color = latColor(p.latencyMs);
             const aboveThreshold = p.latencyMs > alertThreshold;
+            const runnerLine = isActionsMode && p.runnerIp
+              ? `<div style="grid-column:1/-1;margin-top:0.2rem;color:var(--text-muted)">🖥 Runner: <code style="font-size:0.7rem">${p.runnerIp}</code></div>`
+              : '';
             return `
             <div style="background:var(--bg-card,#1e1e2e);border:1px solid ${aboveThreshold ? '#ef4444' : 'var(--border-subtle,#333)'};border-radius:8px;padding:0.85rem;${aboveThreshold ? 'box-shadow:0 0 0 2px rgba(239,68,68,0.25);' : ''}">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
@@ -1843,10 +2217,11 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.2rem;font-size:0.72rem;color:var(--text-muted);">
                 <div>⏱ Latency: <strong style="color:${color}">${p.latencyMs}ms</strong></div>
-                <div>🚀 TTFB: <strong>${p.ttfbMs}ms</strong></div>
-                <div>🔍 DNS: <strong>${p.dnsLookupMs}ms</strong></div>
+                <div>🚀 TTFB: <strong>${p.ttfbMs || '—'}ms</strong></div>
+                <div>🔍 DNS: <strong>${p.dnsLookupMs || '—'}ms</strong></div>
                 <div>📦 Size: <strong>${p.contentLength > 0 ? (p.contentLength > 1024 ? (p.contentLength/1024).toFixed(1)+'KB' : p.contentLength+'B') : '—'}</strong></div>
-                ${repetitions > 1 ? `<div colspan="2">🔁 Reps: <strong>${repetitions}×</strong></div>` : ''}
+                ${p.connectMs !== undefined ? `<div>🔌 Connect: <strong>${p.connectMs}ms</strong></div>` : ''}
+                ${runnerLine}
                 ${p.error ? `<div style="color:#ef4444;grid-column:1/-1;margin-top:0.25rem;">⚠️ ${p.error}</div>` : ''}
                 ${aboveThreshold ? `<div style="color:#ef4444;grid-column:1/-1;margin-top:0.25rem;">🔔 Above ${alertThreshold}ms threshold</div>` : ''}
               </div>
