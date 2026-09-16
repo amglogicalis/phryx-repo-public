@@ -916,68 +916,73 @@ function exportGeoYaml() {
   const url = document.getElementById('geo-url')?.value?.trim() || 'https://example.com';
   const method = document.getElementById('geo-method')?.value || 'GET';
   const timeout = Number(document.getElementById('geo-timeout')?.value) || 8000;
+  const timeoutSec = Math.round(timeout / 1000);
 
-  const yaml = `# PHRYX — The Phantom Mesh: GeoLarva Multi-Region Probe
-# Auto-generated from web console. Runs real probes from 6 global Azure regions.
-name: GeoLarva Global Latency Probe
+  // NOTE: Use string concat to avoid JS template literal collision with GitHub Actions ${{ }} syntax
+  const GHA = (expr) => '${{ ' + expr + ' }}';
 
-on:
-  workflow_dispatch:
-    inputs:
-      target_url:
-        description: 'URL to probe globally'
-        required: true
-        default: '${url}'
-      method:
-        description: 'HTTP Method'
-        required: false
-        default: '${method}'
+  const yaml = [
+    '# PHRYX — The Phantom Mesh: GeoLarva Multi-Region Probe',
+    '# Auto-generated from web console. Runs real probes from 6 global Azure runners.',
+    'name: GeoLarva Global Latency Probe',
+    '',
+    'on:',
+    '  workflow_dispatch:',
+    '    inputs:',
+    '      target_url:',
+    "        description: 'URL to probe globally'",
+    '        required: true',
+    "        default: '" + url + "'",
+    '      method:',
+    "        description: 'HTTP Method'",
+    '        required: false',
+    "        default: '" + method + "'",
+    '',
+    'jobs:',
+    '  geo-probe:',
+    '    strategy:',
+    '      fail-fast: false',
+    '      matrix:',
+    '        region:',
+    '          - east-us',
+    '          - west-europe',
+    '          - southeast-asia',
+    '          - brazil-south',
+    '          - australia-east',
+    '          - south-africa',
+    '    runs-on: ubuntu-latest',
+    '    steps:',
+    "      - name: \"\\uD83C\\uDF0D GeoLarva Probe \\u2014 " + GHA('matrix.region') + '"',
+    '        run: |',
+    '          TARGET="' + GHA('github.event.inputs.target_url') + '"',
+    '          METHOD="' + GHA('github.event.inputs.method') + '"',
+    '          TIMEOUT_S=' + timeoutSec,
+    '          echo "Region: ' + GHA('matrix.region') + '"',
+    '          echo "Target: $TARGET"',
+    '          START=$(date +%s%3N)',
+    '          HTTP_CODE=$(curl -s -o /tmp/probe_body.txt -w "%{http_code}" \\',
+    '            -X "$METHOD" \\',
+    '            -H "X-Phryx-Region: ' + GHA('matrix.region') + '" \\',
+    '            -m "$TIMEOUT_S" \\',
+    '            "$TARGET" 2>/dev/null || echo "000")',
+    '          END=$(date +%s%3N)',
+    '          LATENCY=$((END - START))',
+    '          BODY_SIZE=$(wc -c < /tmp/probe_body.txt || echo 0)',
+    '          echo "HTTP $HTTP_CODE in ${LATENCY}ms (${BODY_SIZE} bytes)"',
+    '          if [ "$HTTP_CODE" -ge 400 ] || [ "$HTTP_CODE" = "000" ]; then',
+    '            echo "Probe failed with HTTP $HTTP_CODE"',
+    '            exit 1',
+    '          fi',
+    '',
+  ].join('\n');
 
-jobs:
-  geo-probe:
-    strategy:
-      fail-fast: false
-      matrix:
-        region:
-          - east-us
-          - west-europe
-          - southeast-asia
-          - brazil-south
-          - australia-east
-          - south-africa
-    runs-on: ubuntu-latest
-    steps:
-      - name: "🌍 GeoLarva Probe — \${{ matrix.region }}"
-        run: |
-          TARGET="${{ github.event.inputs.target_url }}"
-          METHOD="${{ github.event.inputs.method }}"
-          TIMEOUT_S=${Math.round(timeout / 1000)}
-          echo "🌐 Region: \${{ matrix.region }}"
-          echo "🎯 Target: $TARGET"
-          START=\$(date +%s%3N)
-          HTTP_CODE=\$(curl -s -o /tmp/probe_body.txt -w "%{http_code}" \\
-            -X "$METHOD" \\
-            -H "X-Phryx-Region: \${{ matrix.region }}" \\
-            -m "$TIMEOUT_S" \\
-            "$TARGET" 2>/dev/null || echo "000")
-          END=\$(date +%s%3N)
-          LATENCY=\$((END - START))
-          BODY_SIZE=\$(wc -c < /tmp/probe_body.txt || echo 0)
-          echo "✅ HTTP \$HTTP_CODE in \${LATENCY}ms (\${BODY_SIZE} bytes)"
-          if [ "\$HTTP_CODE" -ge 400 ] || [ "\$HTTP_CODE" = "000" ]; then
-            echo "❌ Probe failed with HTTP \$HTTP_CODE"
-            exit 1
-          fi
-`;
-
-  // Copy to clipboard and show in alert
+  // Copy to clipboard
   navigator.clipboard.writeText(yaml).then(() => {
     alert('📋 GitHub Actions YAML copied to clipboard!\n\nPaste it into .github/workflows/geolarva.yml in your repo.');
   }).catch(() => {
-    // Fallback: show in a new window
     const win = window.open('', '_blank');
     if (win) {
-      win.document.write(`<pre style="font-family:monospace;white-space:pre;">${yaml.replace(/</g,'&lt;')}</pre>`);
+      win.document.write('<pre style="font-family:monospace;white-space:pre;padding:2rem;">' + yaml.replace(/</g, '&lt;') + '</pre>');
       win.document.title = 'GeoLarva GitHub Action YAML';
     }
   });
