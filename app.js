@@ -529,8 +529,6 @@ function renderStatus() {
   setText('stat-rules', state.status.reach.activeRules);
   setText('stat-probes', state.status.geolarva.totalProbes);
   setText('stat-gateways', activeGateways);
-  setText('tunnel-active-badge', state.status.tunnels.active);
-  setText('route-active-badge', activeGateways);
   setText('dashboard-ca-fingerprint', state.status.caseshell.caFingerprint);
   setText('storage-target-path', state.status.storage.target);
   setText('storage-type-badge', state.status.storage.type);
