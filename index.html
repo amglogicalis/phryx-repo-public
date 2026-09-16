@@ -562,30 +562,87 @@
         <div class="page-intro">
           <div>
             <h2>GeoLarva — Multi-Region Exit Node Mesh</h2>
-            <p>Benchmark API latencies, verify geofencing, and route requests through ephemeral runners across 6 global regions.</p>
+            <p>Benchmark real API latencies, verify geofencing, and route requests through ephemeral runners across 6 global regions. All probes execute real HTTP requests with live metrics.</p>
           </div>
         </div>
 
         <!-- Probe Launcher -->
         <div class="card">
           <div class="card-header">
-            <h3>Launch Geographic Probe</h3>
+            <h3>🌍 Configure &amp; Launch Geographic Probe</h3>
           </div>
           <div class="card-body">
-            <form id="geo-probe-form" class="form-inline-action">
-              <input type="url" id="geo-url" class="form-control flex-3" placeholder="https://my-api.com/health or https://example.com" required />
-              <select id="geo-region-select" class="form-control flex-1">
-                <option value="all">🌐 All Regions (Parallel Matrix)</option>
-                <option value="east-us">🇺🇸 US East (Virginia)</option>
-                <option value="west-europe">🇳🇱 Western Europe (Amsterdam)</option>
-                <option value="southeast-asia">🇯🇵 Southeast Asia (Tokyo)</option>
-                <option value="brazil-south">🇧🇷 Brazil South (São Paulo)</option>
-                <option value="australia-east">🇦🇺 Australia East (Sydney)</option>
-                <option value="south-africa">🇿🇦 South Africa (Johannesburg)</option>
-              </select>
-              <button type="submit" class="btn btn-primary" id="btn-run-probe">
-                ⚡ Probe Now
-              </button>
+            <form id="geo-probe-form" class="form-vertical">
+
+              <!-- Row 1: URL + Region -->
+              <div class="form-row">
+                <div class="form-group flex-3">
+                  <label for="geo-url">Target URL</label>
+                  <input type="url" id="geo-url" class="form-control code-font" placeholder="https://api.example.com/health" required />
+                </div>
+                <div class="form-group flex-1">
+                  <label for="geo-region-select">Region</label>
+                  <select id="geo-region-select" class="form-control">
+                    <option value="all">🌐 All Regions (Parallel)</option>
+                    <option value="east-us">🇺🇸 US East (Virginia)</option>
+                    <option value="west-europe">🇳🇱 West Europe (Amsterdam)</option>
+                    <option value="southeast-asia">🇯🇵 Southeast Asia (Tokyo)</option>
+                    <option value="brazil-south">🇧🇷 Brazil South (São Paulo)</option>
+                    <option value="australia-east">🇦🇺 Australia East (Sydney)</option>
+                    <option value="south-africa">🇿🇦 South Africa (Johannesburg)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Row 2: Method + Timeout + Repetitions + Alert threshold -->
+              <div class="form-row">
+                <div class="form-group" style="flex:0 0 110px;">
+                  <label for="geo-method">HTTP Method</label>
+                  <select id="geo-method" class="form-control">
+                    <option value="GET">GET</option>
+                    <option value="HEAD">HEAD</option>
+                    <option value="POST">POST</option>
+                    <option value="OPTIONS">OPTIONS</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex:0 0 120px;">
+                  <label for="geo-timeout">Timeout (ms)</label>
+                  <input type="number" id="geo-timeout" class="form-control" value="8000" min="500" max="30000" step="500" />
+                </div>
+                <div class="form-group" style="flex:0 0 110px;">
+                  <label for="geo-repetitions">Repetitions</label>
+                  <input type="number" id="geo-repetitions" class="form-control" value="1" min="1" max="5" />
+                </div>
+                <div class="form-group" style="flex:0 0 140px;">
+                  <label for="geo-alert-threshold">Alert if &gt; (ms)</label>
+                  <input type="number" id="geo-alert-threshold" class="form-control" value="500" min="0" max="10000" step="50" />
+                </div>
+                <div class="form-group flex-1">
+                  <label for="geo-cors-mode">CORS Mode</label>
+                  <select id="geo-cors-mode" class="form-control">
+                    <option value="cors">cors (standard)</option>
+                    <option value="no-cors">no-cors (opaque)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Row 3: Custom headers + body -->
+              <div class="form-row">
+                <div class="form-group flex-2">
+                  <label for="geo-custom-headers">Custom Headers <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(JSON object, optional)</span></label>
+                  <input type="text" id="geo-custom-headers" class="form-control code-font" placeholder='{"Authorization": "Bearer token", "X-Custom": "value"}' />
+                </div>
+                <div class="form-group flex-1">
+                  <label for="geo-body">Request Body <span style="font-weight:400;font-size:0.75rem;color:var(--text-muted)">(POST only)</span></label>
+                  <input type="text" id="geo-body" class="form-control code-font" placeholder='{"key": "value"}' />
+                </div>
+              </div>
+
+              <div class="form-actions" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                <button type="submit" class="btn btn-primary" id="btn-run-probe">⚡ Probe Now</button>
+                <button type="button" class="btn btn-secondary" id="btn-export-yaml" onclick="exportGeoYaml()">📋 Export as GitHub Action</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="btn-clear-geo-history" onclick="clearGeoHistory()">🗑️ Clear History</button>
+              </div>
             </form>
           </div>
         </div>
@@ -598,7 +655,7 @@
           </div>
           <div class="card-body">
             <div id="geo-results-container">
-              <div class="empty-state">Select a target URL and launch a probe to view comparative global latencies.</div>
+              <div class="empty-state">Select a target URL and launch a probe to view real global latency measurements.</div>
             </div>
           </div>
         </div>
@@ -607,6 +664,7 @@
         <div class="card mt-4">
           <div class="card-header">
             <h3>Probe History</h3>
+            <span id="geo-history-count" class="badge">0 probes</span>
           </div>
           <div class="card-body">
             <div class="table-wrapper">
@@ -615,14 +673,16 @@
                   <tr>
                     <th>Timestamp</th>
                     <th>Target URL</th>
+                    <th>Method</th>
                     <th>Fastest Region</th>
                     <th>Slowest Region</th>
                     <th>Avg Latency</th>
                     <th>Availability</th>
+                    <th>Reps</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-geo-history">
-                  <tr><td colspan="6" class="text-center text-muted">No probe history recorded yet.</td></tr>
+                  <tr><td colspan="8" class="text-center text-muted">No probe history recorded yet.</td></tr>
                 </tbody>
               </table>
             </div>

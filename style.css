@@ -766,6 +766,24 @@ body {
   font-weight: 600;
 }
 
+/* Animated pulse for live probe progress */
+@keyframes geo-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.animated-pulse {
+  animation: geo-pulse 1s ease-in-out infinite;
+  background: linear-gradient(90deg, #803cff, #a87ffb, #803cff);
+  background-size: 200% 100%;
+}
+
+/* Color-coding CSS vars for probe thresholds */
+:root {
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
+
 /* ==================== Login Gate Overlay ==================== */
 .login-overlay {
   position: fixed;
