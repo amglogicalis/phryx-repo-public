@@ -313,6 +313,42 @@ const vaultClient = {
     } catch (err) {}
     return [];
   },
+
+  async deleteFile(relPath, commitMsg) {
+    if (!state.ghToken) return false;
+    const repoFullName = this.getRepo();
+    try {
+      let sha = undefined;
+      const checkRes = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+        },
+      });
+      if (checkRes.ok) {
+        const cur = await checkRes.json();
+        sha = cur.sha;
+      }
+      if (!sha) return false;
+
+      const delRes = await fetch(`https://api.github.com/repos/${repoFullName}/contents/${relPath}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${state.ghToken}`,
+          Accept: 'application/vnd.github.v3+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: commitMsg || `phryx(web-console): delete ${relPath}`,
+          sha,
+        }),
+      });
+      return delRes.ok;
+    } catch (err) {
+      console.warn('[VaultClient] Error deleting file in vault:', err);
+      return false;
+    }
+  },
 };
 
 async function authenticate(token) {
@@ -875,6 +911,146 @@ async function loadGeoHistory() {
   renderGeoHistory();
 }
 
+const GEO_REGION_META = {
+  'east-us':        { flag: '🇺🇸', name: 'US East (Virginia)' },
+  'west-europe':    { flag: '🇳🇱', name: 'West Europe (Amsterdam)' },
+  'southeast-asia': { flag: '🇯🇵', name: 'Southeast Asia (Tokyo)' },
+  'brazil-south':   { flag: '🇧🇷', name: 'Brazil South (São Paulo)' },
+  'australia-east': { flag: '🇦🇺', name: 'Australia East (Sydney)' },
+  'south-africa':   { flag: '🇿🇦', name: 'South Africa (Johannesburg)' },
+};
+
+function displayGeoProbeMatrix(matrix) {
+  if (!matrix) return;
+  const container = document.getElementById('geo-results-container');
+  const statusTag = document.getElementById('geo-matrix-status');
+  const alertThreshold = matrix.alertThreshold || 500;
+
+  if (statusTag) {
+    const rate = matrix.summary?.globalSuccessRate ?? 0;
+    const modeLabel = matrix.executionMode === 'github-actions' ? ' 🤖 GH Actions' : matrix.executionMode === 'local-api' ? ' 🖥 Local API' : ' 🌐 Browser';
+    statusTag.textContent = `${rate === 100 ? '✅' : rate > 0 ? '⚠️' : '❌'} ${rate}% OK — ${matrix.summary?.avgLatencyMs ?? 0}ms avg${modeLabel}`;
+  }
+
+  if (container && matrix.probes) {
+    const maxLat = Math.max(...matrix.probes.map((p) => p.latencyMs || 0), 1);
+    const isActionsMode = matrix.executionMode === 'github-actions';
+
+    const latColor = (ms) => {
+      if (ms <= alertThreshold * 0.5) return 'var(--color-success, #22c55e)';
+      if (ms <= alertThreshold) return 'var(--color-warning, #f59e0b)';
+      return 'var(--color-danger, #ef4444)';
+    };
+
+    const statusBadge = (p) => {
+      if (!p.success) return `<span style="color:#ef4444;font-weight:600;">${p.status || 'ERR'}</span>`;
+      if (p.status >= 200 && p.status < 300) return `<span style="color:#22c55e;font-weight:600;">${p.status}</span>`;
+      return `<span style="color:#f59e0b;font-weight:600;">${p.status}</span>`;
+    };
+
+    const modeBadge = isActionsMode
+      ? '<span style="background:#1a3a2a;color:#22c55e;border:1px solid #22c55e44;border-radius:4px;padding:2px 8px;font-size:0.7rem;font-weight:700;">🤖 GitHub Actions — real curl</span>'
+      : '<span style="background:#1a1a3a;color:#a87ffb;border:1px solid #a87ffb44;border-radius:4px;padding:2px 8px;font-size:0.7rem;font-weight:700;">🌐 Browser fetch (CORS)</span>';
+
+    const runLinkHtml = isActionsMode && matrix.runUrl
+      ? `<span>🔗 <a href="${matrix.runUrl}" target="_blank" style="color:#a87ffb">View Actions run ↗</a></span>`
+      : '';
+
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;">
+        ${modeBadge}
+        ${runLinkHtml}
+        <span style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;">Target: <code style="color:#c4a4ff">${matrix.url}</code></span>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:0.75rem; margin-bottom:1rem;">
+        ${matrix.probes.map((p) => {
+          const widthPct = Math.round(((p.latencyMs || 0) / maxLat) * 100);
+          const color = latColor(p.latencyMs || 0);
+          const aboveThreshold = (p.latencyMs || 0) > alertThreshold;
+          const runnerLine = isActionsMode && p.runnerIp
+            ? `<div style="grid-column:1/-1;margin-top:0.2rem;color:var(--text-muted)">🖥 Runner: <code style="font-size:0.7rem">${p.runnerIp}</code></div>`
+            : '';
+          return `
+          <div style="background:var(--bg-card,#1e1e2e);border:1px solid ${aboveThreshold ? '#ef4444' : 'var(--border-subtle,#333)'};border-radius:8px;padding:0.85rem;${aboveThreshold ? 'box-shadow:0 0 0 2px rgba(239,68,68,0.25);' : ''}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
+              <span style="font-weight:600;">${p.flag || '🌐'} ${p.regionName || p.region}</span>
+              <span>${statusBadge(p)}</span>
+            </div>
+            <div class="probe-bar-track" style="margin-bottom:0.5rem;height:6px;">
+              <div class="probe-bar-fill" style="width:${widthPct}%;background:${color};height:6px;border-radius:3px;"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.2rem;font-size:0.72rem;color:var(--text-muted);">
+              <div>⏱ Latency: <strong style="color:${color}">${p.latencyMs ?? '—'}ms</strong></div>
+              <div>🚀 TTFB: <strong>${p.ttfbMs ?? '—'}ms</strong></div>
+              <div>🔍 DNS: <strong>${p.dnsLookupMs ?? '—'}ms</strong></div>
+              <div>📦 Size: <strong>${p.contentLength > 0 ? (p.contentLength > 1024 ? (p.contentLength/1024).toFixed(1)+'KB' : p.contentLength+'B') : '—'}</strong></div>
+              ${p.connectMs !== undefined ? `<div>🔌 Connect: <strong>${p.connectMs}ms</strong></div>` : ''}
+              ${runnerLine}
+              ${p.error ? `<div style="color:#ef4444;grid-column:1/-1;margin-top:0.25rem;">⚠️ ${p.error}</div>` : ''}
+              ${aboveThreshold ? `<div style="color:#ef4444;grid-column:1/-1;margin-top:0.25rem;">🔔 Above ${alertThreshold}ms threshold</div>` : ''}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="font-size:0.78rem;color:var(--text-muted);border-top:1px solid var(--border-subtle);padding-top:0.75rem;display:flex;gap:1.5rem;flex-wrap:wrap;align-items:center;">
+        <span>🏆 Fastest: <strong>${GEO_REGION_META[matrix.summary?.fastestRegion]?.flag || ''} ${matrix.summary?.fastestRegion || '—'}</strong></span>
+        <span>🐢 Slowest: <strong>${GEO_REGION_META[matrix.summary?.slowestRegion]?.flag || ''} ${matrix.summary?.slowestRegion || '—'}</strong></span>
+        <span>📊 Avg: <strong>${matrix.summary?.avgLatencyMs ?? '—'}ms</strong></span>
+        <span>✅ Success: <strong>${matrix.summary?.globalSuccessRate ?? '—'}%</strong></span>
+        <span>📡 Method: <strong>${matrix.method || 'GET'}</strong></span>
+        <span>🕒 ${new Date(matrix.timestamp).toLocaleTimeString()}</span>
+      </div>
+    `;
+  }
+}
+
+function reviewGeoRun(id) {
+  const m = state.geoHistory.find((item) => item.id === id);
+  if (!m) return;
+
+  const urlInput = document.getElementById('geo-url');
+  const methodSelect = document.getElementById('geo-method');
+  const timeoutInput = document.getElementById('geo-timeout');
+  const alertInput = document.getElementById('geo-alert-threshold');
+  const repInput = document.getElementById('geo-repetitions');
+
+  if (urlInput && m.url) urlInput.value = m.url;
+  if (methodSelect && m.method) methodSelect.value = m.method;
+  if (timeoutInput && m.timeoutMs) timeoutInput.value = m.timeoutMs;
+  if (alertInput && m.alertThreshold) alertInput.value = m.alertThreshold;
+  if (repInput && m.repetitions) repInput.value = m.repetitions;
+
+  displayGeoProbeMatrix(m);
+
+  const resultsCard = document.getElementById('geo-results-container')?.closest('.card');
+  if (resultsCard) {
+    resultsCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+window.reviewGeoRun = reviewGeoRun;
+
+async function deleteGeoRun(id) {
+  const idx = state.geoHistory.findIndex((m) => m.id === id);
+  if (idx === -1) return;
+
+  const target = state.geoHistory[idx];
+  const formattedTime = new Date(target.timestamp).toLocaleTimeString();
+  if (!confirm(`¿Eliminar la sonda para "${target.url}" (${formattedTime})?`)) return;
+
+  state.geoHistory.splice(idx, 1);
+  localStorage.setItem('phryx_geo_history', JSON.stringify(state.geoHistory.slice(0, 50)));
+
+  if (state.ghToken) {
+    vaultClient.deleteFile(`geo/history/${id}.json`, `phryx(geo): delete probe record ${id}`).catch((err) => {
+      console.warn('[GeoLarva] Failed to delete history file from vault:', err);
+    });
+  }
+
+  renderGeoHistory();
+  refreshStatus();
+}
+window.deleteGeoRun = deleteGeoRun;
+
 function renderGeoHistory() {
   const tbody = document.getElementById('tbody-geo-history');
   const countBadge = document.getElementById('geo-history-count');
@@ -883,10 +1059,10 @@ function renderGeoHistory() {
   if (countBadge) countBadge.textContent = `${state.geoHistory.length} probe${state.geoHistory.length !== 1 ? 's' : ''}`;
 
   if (state.geoHistory.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No probe history recorded yet.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No probe history recorded yet.</td></tr>';
   } else {
     tbody.innerHTML = state.geoHistory
-      .slice(0, 20)
+      .slice(0, 50)
       .map((m) => {
         const fastest = m.summary?.fastestRegion || '—';
         const slowest = m.summary?.slowestRegion || '—';
@@ -902,6 +1078,12 @@ function renderGeoHistory() {
         <td><strong>${m.summary?.avgLatencyMs ?? '—'}ms</strong></td>
         <td><span class="badge ${rateClass}">${rate}%</span></td>
         <td>${m.repetitions || 1}×</td>
+        <td>
+          <div style="display:flex;gap:0.35rem;align-items:center;">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="reviewGeoRun('${m.id}')" title="Revisar resultados en el panel">👁️ Review</button>
+            <button type="button" class="btn btn-danger btn-xs" onclick="deleteGeoRun('${m.id}')" title="Eliminar registro">🗑️</button>
+          </div>
+        </td>
       </tr>
     `;
       })
@@ -2204,76 +2386,7 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     }
 
     // ── Render probe result cards ─────────────────────────────────────────────
-    if (container && matrix) {
-      const maxLat = Math.max(...matrix.probes.map((p) => p.latencyMs), 1);
-      const isActionsMode = matrix.executionMode === 'github-actions';
-
-      const latColor = (ms) => {
-        if (ms <= alertThreshold * 0.5) return 'var(--color-success, #22c55e)';
-        if (ms <= alertThreshold) return 'var(--color-warning, #f59e0b)';
-        return 'var(--color-danger, #ef4444)';
-      };
-
-      const statusBadge = (p) => {
-        if (!p.success) return `<span style="color:#ef4444;font-weight:600;">${p.status || 'ERR'}</span>`;
-        if (p.status >= 200 && p.status < 300) return `<span style="color:#22c55e;font-weight:600;">${p.status}</span>`;
-        return `<span style="color:#f59e0b;font-weight:600;">${p.status}</span>`;
-      };
-
-      const modeBadge = isActionsMode
-        ? '<span style="background:#1a3a2a;color:#22c55e;border:1px solid #22c55e44;border-radius:4px;padding:2px 8px;font-size:0.7rem;font-weight:700;">🤖 GitHub Actions — real curl</span>'
-        : '<span style="background:#1a1a3a;color:#a87ffb;border:1px solid #a87ffb44;border-radius:4px;padding:2px 8px;font-size:0.7rem;font-weight:700;">🌐 Browser fetch (CORS)</span>';
-
-      const existingLink = document.getElementById('geo-actions-link');
-      const runLinkHtml = isActionsMode && matrix.runUrl
-        ? `<span>🔗 <a href="${matrix.runUrl}" target="_blank" style="color:#a87ffb">View Actions run ↗</a></span>`
-        : '';
-
-      container.innerHTML = `
-        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-wrap:wrap;">
-          ${modeBadge}
-          ${runLinkHtml}
-        </div>
-        <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:0.75rem; margin-bottom:1rem;">
-          ${matrix.probes.map((p) => {
-            const widthPct = Math.round((p.latencyMs / maxLat) * 100);
-            const color = latColor(p.latencyMs);
-            const aboveThreshold = p.latencyMs > alertThreshold;
-            const runnerLine = isActionsMode && p.runnerIp
-              ? `<div style="grid-column:1/-1;margin-top:0.2rem;color:var(--text-muted)">🖥 Runner: <code style="font-size:0.7rem">${p.runnerIp}</code></div>`
-              : '';
-            return `
-            <div style="background:var(--bg-card,#1e1e2e);border:1px solid ${aboveThreshold ? '#ef4444' : 'var(--border-subtle,#333)'};border-radius:8px;padding:0.85rem;${aboveThreshold ? 'box-shadow:0 0 0 2px rgba(239,68,68,0.25);' : ''}">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                <span style="font-weight:600;">${p.flag || '🌐'} ${p.regionName}</span>
-                <span>${statusBadge(p)}</span>
-              </div>
-              <div class="probe-bar-track" style="margin-bottom:0.5rem;height:6px;">
-                <div class="probe-bar-fill" style="width:${widthPct}%;background:${color};height:6px;border-radius:3px;"></div>
-              </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.2rem;font-size:0.72rem;color:var(--text-muted);">
-                <div>⏱ Latency: <strong style="color:${color}">${p.latencyMs}ms</strong></div>
-                <div>🚀 TTFB: <strong>${p.ttfbMs || '—'}ms</strong></div>
-                <div>🔍 DNS: <strong>${p.dnsLookupMs || '—'}ms</strong></div>
-                <div>📦 Size: <strong>${p.contentLength > 0 ? (p.contentLength > 1024 ? (p.contentLength/1024).toFixed(1)+'KB' : p.contentLength+'B') : '—'}</strong></div>
-                ${p.connectMs !== undefined ? `<div>🔌 Connect: <strong>${p.connectMs}ms</strong></div>` : ''}
-                ${runnerLine}
-                ${p.error ? `<div style="color:#ef4444;grid-column:1/-1;margin-top:0.25rem;">⚠️ ${p.error}</div>` : ''}
-                ${aboveThreshold ? `<div style="color:#ef4444;grid-column:1/-1;margin-top:0.25rem;">🔔 Above ${alertThreshold}ms threshold</div>` : ''}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-        <div style="font-size:0.78rem;color:var(--text-muted);border-top:1px solid var(--border-subtle);padding-top:0.75rem;display:flex;gap:1.5rem;flex-wrap:wrap;">
-          <span>🏆 Fastest: <strong>${REGION_META[matrix.summary.fastestRegion]?.flag || ''} ${matrix.summary.fastestRegion}</strong></span>
-          <span>🐢 Slowest: <strong>${REGION_META[matrix.summary.slowestRegion]?.flag || ''} ${matrix.summary.slowestRegion}</strong></span>
-          <span>📊 Avg: <strong>${matrix.summary.avgLatencyMs}ms</strong></span>
-          <span>✅ Success: <strong>${matrix.summary.globalSuccessRate}%</strong></span>
-          <span>📡 Method: <strong>${method}</strong></span>
-          <span>🕒 ${new Date(matrix.timestamp).toLocaleTimeString()}</span>
-        </div>
-      `;
-    }
+    displayGeoProbeMatrix(matrix);
 
     renderGeoHistory();
     refreshStatus();
