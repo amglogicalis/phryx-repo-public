@@ -747,6 +747,7 @@
                     <label for="cloud-provider-type" style="font-size: 0.78rem;">Target Cloud Provider</label>
                     <select id="cloud-provider-type" class="form-control">
                       <option value="cloudflare-ip-rule">Cloudflare WAF (IP Access Rules)</option>
+                      <option value="cloudflare-tunnel">Cloudflare Edge Tunnel / TryCloudflare</option>
                       <option value="generic-webhook">Generic Webhook / Custom Firewall API</option>
                       <option value="aws-security-group">AWS Security Groups (EC2/RDS)</option>
                     </select>
@@ -891,8 +892,14 @@
         <!-- Audit Log History -->
         <div class="card mt-4">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h3>SilkFilter Audit Trail (Injections, Auto-Purges & Vault Logs)</h3>
-            <button class="btn btn-secondary btn-sm" id="btn-refresh-reach-logs">🔄 Refresh</button>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h3>SilkFilter Audit Trail (Injections, Auto-Purges & Vault Logs)</h3>
+              <span class="badge" id="reach-logs-count" style="background: rgba(128, 60, 255, 0.15); color: #c084fc; font-size: 0.72rem;">0 logs</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-refresh-reach-logs">🔄 Refresh</button>
+              <button class="btn btn-danger btn-sm" id="btn-clear-reach-logs">🧹 Clear Records</button>
+            </div>
           </div>
           <div class="card-body">
             <div class="table-wrapper">
@@ -906,10 +913,11 @@
                     <th>Target Resource</th>
                     <th>Injected IP</th>
                     <th>Status</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-reach-logs">
-                  <tr><td colspan="7" class="text-center text-muted">No ACL operations logged yet.</td></tr>
+                  <tr><td colspan="8" class="text-center text-muted">No ACL operations logged yet.</td></tr>
                 </tbody>
               </table>
             </div>

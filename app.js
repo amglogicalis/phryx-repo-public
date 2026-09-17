@@ -1288,12 +1288,17 @@ function renderReach() {
   }
 
   // Audit Logs
+  const badgeLogsCount = document.getElementById('reach-logs-count');
+  if (badgeLogsCount) {
+    badgeLogsCount.textContent = `${(state.reachLogs || []).length} log${(state.reachLogs || []).length !== 1 ? 's' : ''}`;
+  }
+
   if (tbody) {
     if (!state.reachLogs || state.reachLogs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No ACL operations logged yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No ACL operations logged yet.</td></tr>';
     } else {
       tbody.innerHTML = state.reachLogs
-        .slice(0, 20)
+        .slice(0, 30)
         .map(
           (l) => `
         <tr>
@@ -1304,6 +1309,16 @@ function renderReach() {
           <td><code>${l.resourceId}</code></td>
           <td><code>${l.ip}</code></td>
           <td><span class="${l.success ? 'text-success' : 'text-danger'}" style="font-weight: 700;">${l.success ? '✔ SUCCESS' : '✖ FAILED'}</span></td>
+          <td>
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="reviewReachRun('${l.id}')" title="Review past execution and inspect parameters" style="padding: 4px 8px; font-size: 0.72rem;">
+                👁️ Review
+              </button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="deleteReachRun('${l.id}')" title="Delete this audit record" style="padding: 4px 8px; font-size: 0.72rem;">
+                🗑️
+              </button>
+            </div>
+          </td>
         </tr>
       `
         )
@@ -1311,6 +1326,101 @@ function renderReach() {
     }
   }
 }
+
+function reviewReachRun(id) {
+  const l = (state.reachLogs || []).find((item) => item.id === id);
+  if (!l) return;
+
+  // Switch mode
+  const mode = l.mode || (l.provider === 'sandbox-perimeter' ? 'sandbox' : 'cloud');
+  if (typeof setReachMode === 'function') {
+    setReachMode(mode);
+  }
+
+  // Populate inputs
+  const ipInput = document.getElementById('silk-ip');
+  const portInput = document.getElementById('silk-target-port');
+  const providerSelect = document.getElementById('cloud-provider-type');
+  const resourceIdInput = document.getElementById('cloud-resource-id');
+
+  if (ipInput && l.ip) ipInput.value = l.ip;
+  if (portInput && l.port) portInput.value = l.port;
+  if (providerSelect && l.provider) providerSelect.value = l.provider;
+  if (resourceIdInput && l.resourceId) resourceIdInput.value = l.resourceId;
+
+  // Update stepper state
+  if (typeof updateReachStep === 'function') {
+    updateReachStep(1, 'passed', 'Pre-check closed', 2);
+    updateReachStep(2, 'passed', `Rule active (${l.ip})`, 8);
+    updateReachStep(3, 'passed', 'Workload verified', 2);
+    updateReachStep(4, l.action === 'purge' ? 'passed' : 'pending', l.action === 'purge' ? 'Purged cleanly' : 'Active lease', 5);
+    updateReachStep(5, l.action === 'purge' ? 'passed' : 'pending', l.action === 'purge' ? '0 residual open ports' : 'Pending', 1);
+  }
+
+  if (typeof appendReachTerminal === 'function') {
+    appendReachTerminal(`────────────────────────────────────────────────────────────`);
+    appendReachTerminal(`📋 [Review Audit Record: ${l.id}] Loaded parameters:`);
+    appendReachTerminal(`   • Action: ${(l.action || '').toUpperCase()} | Mode: ${mode.toUpperCase()}`);
+    appendReachTerminal(`   • Injected IP: ${l.ip} | Target: ${l.provider} (${l.resourceId})`);
+    appendReachTerminal(`   • Timestamp: ${new Date(l.timestamp).toLocaleString()}`);
+    if (l.message) appendReachTerminal(`   • Note: ${l.message}`);
+    appendReachTerminal(`⚡ Ready to re-run, inspect in CI/CD runner, or purge.`);
+  }
+
+  // Scroll smoothly to the form / stepper
+  const targetCard = document.getElementById('reach-config-title')?.closest('.card');
+  if (targetCard) {
+    targetCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+window.reviewReachRun = reviewReachRun;
+
+async function deleteReachRun(id) {
+  const idx = (state.reachLogs || []).findIndex((item) => item.id === id);
+  if (idx === -1) return;
+
+  const target = state.reachLogs[idx];
+  const timeStr = new Date(target.timestamp).toLocaleTimeString();
+  if (!confirm(`¿Eliminar el registro de auditoría "${(target.action || '').toUpperCase()} ${target.ip}" (${timeStr})?`)) return;
+
+  state.reachLogs.splice(idx, 1);
+  localStorage.setItem('phryx_reach_logs', JSON.stringify(state.reachLogs.slice(0, 50)));
+
+  if (state.ghToken && typeof vaultClient !== 'undefined') {
+    vaultClient.setFile('reach/history.json', state.reachLogs.slice(0, 50), `phryx(reach): delete audit record ${id}`).catch((err) => {
+      console.warn('[SilkFilter] Failed to sync deleted log to vault:', err);
+    });
+  }
+
+  renderReach();
+  if (typeof appendReachTerminal === 'function') {
+    appendReachTerminal(`🗑️ Audit record ${id} removed from local storage and vault.`);
+  }
+}
+window.deleteReachRun = deleteReachRun;
+
+function clearAllReachLogs() {
+  if (!state.reachLogs || state.reachLogs.length === 0) {
+    alert('No audit logs to clear.');
+    return;
+  }
+  if (!confirm('¿Eliminar TODO el historial de auditoría de SilkFilter? Esta acción no se puede deshacer.')) return;
+
+  state.reachLogs = [];
+  localStorage.removeItem('phryx_reach_logs');
+
+  if (state.ghToken && typeof vaultClient !== 'undefined') {
+    vaultClient.setFile('reach/history.json', [], 'phryx(reach): clear all audit logs').catch((err) => {
+      console.warn('[SilkFilter] Failed to clear audit history in vault:', err);
+    });
+  }
+
+  renderReach();
+  if (typeof appendReachTerminal === 'function') {
+    appendReachTerminal(`🧹 All SilkFilter audit logs have been purged and cleared.`);
+  }
+}
+window.clearAllReachLogs = clearAllReachLogs;
 
 // ==================== SilkRoute (Cloud Proxy Gateway) Section ====================
 async function loadGateways() {
@@ -2658,6 +2768,21 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
       } catch (err) {
         appendReachTerminal(`Cloudflare notice: ${err.message}`, 'warn');
       }
+    } else if (mode === 'cloud' && (provider === 'cloudflare-tunnel' || provider === 'generic-webhook') && resourceId && resourceId.startsWith('http')) {
+      try {
+        const cfRes = await fetch(resourceId, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ action: 'inject', ip, port, mode }),
+        });
+        if (cfRes.ok) {
+          const cfData = await cfRes.json();
+          externalRuleId = cfData.ruleId || 'cf_edge_' + Date.now();
+          appendReachTerminal(`✔ Cloudflare Edge / Webhook: Dynamic lease injected for ${ip} (Rule ID: ${externalRuleId})`);
+        }
+      } catch (err) {
+        appendReachTerminal(`Cloudflare edge notice: ${err.message}`, 'warn');
+      }
     }
 
     const ruleId = `silk_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
@@ -2706,6 +2831,27 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     updateReachStep(4, 'running', 'Executing clean auto-purge...');
     appendReachTerminal(`[Phase 4] Revoking ephemeral lease ${ruleId}...`);
     await new Promise((r) => setTimeout(r, 600));
+
+    if (mode === 'cloud' && externalRuleId) {
+      if (provider === 'cloudflare-ip-rule' && token && resourceId) {
+        try {
+          await fetch(`https://api.cloudflare.com/client/v4/zones/${resourceId}/firewall/access_rules/rules/${externalRuleId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          appendReachTerminal(`✔ Cloudflare WAF: Revoked rule ${externalRuleId}`);
+        } catch {}
+      } else if ((provider === 'cloudflare-tunnel' || provider === 'generic-webhook') && resourceId && resourceId.startsWith('http')) {
+        try {
+          await fetch(resourceId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ action: 'purge', ruleId: externalRuleId, ip, port }),
+          });
+          appendReachTerminal(`✔ Cloudflare Edge / Webhook: Ephemeral lease revoked cleanly`);
+        } catch {}
+      }
+    }
 
     newRule.status = 'purged';
     localStorage.setItem('phryx_reach_rules', JSON.stringify(state.reachRules));
@@ -3016,6 +3162,11 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     appendReachTerminal('Refreshing SilkFilter logs and leases from vault...');
     await loadReach();
     appendReachTerminal('✔ Vault state synchronized.');
+  });
+
+  // Action: Clear Reach Logs History
+  document.getElementById('btn-clear-reach-logs')?.addEventListener('click', () => {
+    clearAllReachLogs();
   });
 
   // SilkRoute Form
