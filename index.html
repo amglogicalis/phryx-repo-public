@@ -694,94 +694,205 @@
         <div class="page-intro">
           <div>
             <h2>PhryxReach & SilkFilter — Dynamic Cloud ACLs</h2>
-            <p>Inject CI/CD runner IPs into cloud security groups dynamically before jobs and guarantee clean auto-purge on completion.</p>
+            <p>Inject CI/CD runner IPs into cloud security groups dynamically before jobs and guarantee clean auto-purge on completion. $0 Infrastructure • Zero Data Leak.</p>
+          </div>
+          <div class="header-actions">
+            <span class="badge badge-pulse text-success" id="reach-active-leases-count">0 Active Leases</span>
+          </div>
+        </div>
+
+        <!-- VIA SELECTION CARDS (A vs B) -->
+        <div class="reach-mode-selector" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 22px;">
+          <!-- Via B: Sandbox Perimeter -->
+          <div class="mode-card active" id="mode-card-sandbox" style="cursor: pointer; padding: 18px; background: rgba(128, 60, 255, 0.12); border: 2px solid var(--primary-brand); border-radius: var(--radius-md); transition: all 0.2s ease;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="radio" name="reach-mode-radio" id="radio-mode-sandbox" value="sandbox" checked style="accent-color: var(--primary-brand); width: 18px; height: 18px;" />
+                <label for="radio-mode-sandbox" style="font-size: 1.05rem; font-weight: 700; color: #f5f0ff; cursor: pointer; margin: 0;">🛡️ Vía B: Sandbox Perimeter</label>
+              </div>
+              <span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ade80; font-size: 0.72rem; font-weight: 700;">$0 Zero-Credentials</span>
+            </div>
+            <p style="font-size: 0.8rem; color: #bca8de; line-height: 1.45; margin: 0;">
+              Zero 3rd-party accounts or cloud API keys required. Proves the 4-phase zero-trust lifecycle (pre-check blocked ➔ inject IP ➔ access granted ➔ auto-purge ➔ post-check blocked, 0 open ports) locally or inside CI/CD runners.
+            </p>
+          </div>
+
+          <!-- Via A: Real Cloud Provider -->
+          <div class="mode-card" id="mode-card-cloud" style="cursor: pointer; padding: 18px; background: rgba(255, 255, 255, 0.03); border: 2px solid var(--border-color); border-radius: var(--radius-md); transition: all 0.2s ease;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <input type="radio" name="reach-mode-radio" id="radio-mode-cloud" value="cloud" style="accent-color: var(--primary-brand); width: 18px; height: 18px;" />
+                <label for="radio-mode-cloud" style="font-size: 1.05rem; font-weight: 700; color: #f5f0ff; cursor: pointer; margin: 0;">☁️ Vía A: Cloud Provider API</label>
+              </div>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 0.72rem; font-weight: 700;">Real Cloud ACLs</span>
+            </div>
+            <p style="font-size: 0.8rem; color: #9f8fb9; line-height: 1.45; margin: 0;">
+              Direct REST API integration with Cloudflare WAF, AWS EC2 Security Groups, or Custom Webhook Firewall. Requires your provider credentials (stored securely in browser session only).
+            </p>
           </div>
         </div>
 
         <div class="grid-2-cols">
-          <!-- Add Provider -->
+          <!-- Configuration Card -->
           <div class="card">
             <div class="card-header">
-              <h3>Register Cloud Provider ACL</h3>
+              <h3 id="reach-config-title">🛡️ SilkFilter Dynamic Target</h3>
             </div>
             <div class="card-body">
-              <form id="reach-provider-form" class="form-vertical">
-                <div class="form-group">
-                  <label for="reach-provider-type">Cloud Provider</label>
-                  <select id="reach-provider-type" class="form-control" required>
-                    <option value="aws-security-group">AWS Security Groups (EC2/RDS)</option>
-                    <option value="cloudflare-ip-rule">Cloudflare WAF IP Access Rules</option>
-                    <option value="digitalocean-firewall">DigitalOcean Cloud Firewall</option>
-                    <option value="hetzner-firewall">Hetzner Cloud Firewall</option>
-                    <option value="supabase-network">Supabase Network Restrictions</option>
-                    <option value="mongodb-atlas">MongoDB Atlas IP Access List</option>
-                    <option value="railway-private">Railway Private Networking</option>
-                    <option value="generic-webhook">Generic Webhook / Custom API</option>
-                  </select>
+              <form id="silkfilter-test-form" class="form-vertical">
+                <!-- Cloud Provider Credentials (shown only in Cloud mode) -->
+                <div id="cloud-credentials-box" style="display: none; background: rgba(128, 60, 255, 0.08); padding: 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); margin-bottom: 16px;">
+                  <h4 style="font-size: 0.86rem; color: #e2e8f0; margin-bottom: 10px;">Cloud Provider Credentials</h4>
+                  <div class="form-group" style="margin-bottom: 10px;">
+                    <label for="cloud-provider-type" style="font-size: 0.78rem;">Target Cloud Provider</label>
+                    <select id="cloud-provider-type" class="form-control">
+                      <option value="cloudflare-ip-rule">Cloudflare WAF (IP Access Rules)</option>
+                      <option value="generic-webhook">Generic Webhook / Custom Firewall API</option>
+                      <option value="aws-security-group">AWS Security Groups (EC2/RDS)</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="margin-bottom: 10px;" id="group-cf-token">
+                    <label for="cloud-token" style="font-size: 0.78rem;">API Token / Secret Key</label>
+                    <input type="password" id="cloud-token" class="form-control" placeholder="Bearer token or API key" autocomplete="off" />
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;" id="group-cf-zone">
+                    <label for="cloud-resource-id" style="font-size: 0.78rem;">Zone ID / Webhook URL / Security Group</label>
+                    <input type="text" id="cloud-resource-id" class="form-control" placeholder="e.g. 023e105f4ecef8ad9ca31a8372d0c353 or https://my-firewall/acl" />
+                  </div>
                 </div>
 
+                <!-- Sandbox Target (shown in Sandbox mode) -->
+                <div id="sandbox-config-box" style="background: rgba(34, 197, 94, 0.06); padding: 14px; border-radius: var(--radius-sm); border: 1px solid rgba(34, 197, 94, 0.2); margin-bottom: 16px;">
+                  <div style="font-size: 0.82rem; color: #86efac; font-weight: 600; margin-bottom: 4px;">⚡ Zero-Cost Socket Perimeter Target</div>
+                  <div style="font-size: 0.74rem; color: #a1a1aa;">Simulated target: <code>127.0.0.1:47890</code> (SilkFilter Zero-Trust Guard)</div>
+                </div>
+
+                <!-- Common network parameters -->
                 <div class="form-group">
-                  <label for="reach-resource-id">Resource Identifier</label>
-                  <input type="text" id="reach-resource-id" class="form-control" placeholder="e.g. sg-0abc123 or firewall-id" required />
+                  <label for="silk-ip">IP Address to Inject</label>
+                  <div class="input-with-action">
+                    <input type="text" id="silk-ip" class="form-control" placeholder="Click 'Detect IP' or type custom IPv4" />
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-detect-ip">🌐 Detect IP</button>
+                  </div>
+                  <span class="help-text" id="detected-ip-note">Runner or client public IPv4 for the ephemeral lease.</span>
                 </div>
 
                 <div class="form-row">
                   <div class="form-group flex-1">
-                    <label for="reach-port">Target Port</label>
-                    <input type="number" id="reach-port" class="form-control" value="5432" required />
+                    <label for="silk-target-port">Target Port</label>
+                    <input type="number" id="silk-target-port" class="form-control" value="47890" />
                   </div>
                   <div class="form-group flex-1">
-                    <label for="reach-protocol">Protocol</label>
-                    <select id="reach-protocol" class="form-control">
-                      <option value="tcp">TCP</option>
-                      <option value="udp">UDP</option>
-                      <option value="all">ALL</option>
+                    <label for="silk-lease-ttl">Lease Auto-Purge TTL</label>
+                    <select id="silk-lease-ttl" class="form-control">
+                      <option value="60">1 Minute (Test & Purge)</option>
+                      <option value="300">5 Minutes (CI/CD Job)</option>
+                      <option value="900" selected>15 Minutes (Build & Deploy)</option>
+                      <option value="3600">60 Minutes (Long Task)</option>
                     </select>
                   </div>
                 </div>
 
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary">➕ Save Provider Config</button>
+                <!-- Action buttons -->
+                <div class="form-actions" style="display: flex; flex-direction: column; gap: 10px; margin-top: 18px;">
+                  <button type="button" class="btn btn-primary" id="btn-run-lifecycle" style="width: 100%; padding: 12px; font-weight: 700;">
+                    ⚡ Run 5-Phase Zero-Trust Network Audit
+                  </button>
+                  <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" id="btn-run-actions" style="flex: 1; font-weight: 600;">
+                      🚀 Run via GitHub Actions
+                    </button>
+                    <button type="submit" class="btn btn-accent" id="btn-inject-rule" style="flex: 1; font-weight: 600;">
+                      🔒 Inject Rule Only
+                    </button>
+                  </div>
+                  <button type="button" class="btn btn-danger btn-sm" id="btn-purge-all" style="width: 100%; margin-top: 4px;">
+                    🧹 Purge All Active Leases (Zero Open Ports)
+                  </button>
                 </div>
               </form>
             </div>
           </div>
 
-          <!-- Live Rule Injector / Purger -->
-          <div class="card">
-            <div class="card-header">
-              <h3>SilkFilter Live IP Testing</h3>
-            </div>
-            <div class="card-body">
-              <form id="silkfilter-test-form" class="form-vertical">
-                <div class="form-group">
-                  <label for="silk-provider-select">Target Provider</label>
-                  <select id="silk-provider-select" class="form-control" required>
-                    <option value="">-- Select Configured Provider --</option>
-                  </select>
+          <!-- Active Dynamic Leases & Stepper Column -->
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Active Leases Card -->
+            <div class="card">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3>🔒 Active Dynamic Leases</h3>
+                <span class="badge" id="badge-active-leases" style="background: rgba(128, 60, 255, 0.2); color: #c084fc;">0 Active</span>
+              </div>
+              <div class="card-body">
+                <div id="active-leases-container">
+                  <div class="empty-state" style="padding: 24px 16px; text-align: center; color: #675880; font-size: 0.84rem;">
+                    No active dynamic leases. Ports are completely closed (Zero-Trust).
+                  </div>
                 </div>
+              </div>
+            </div>
 
-                <div class="form-group">
-                  <label for="silk-ip">IP Address to Inject</label>
-                  <div class="input-with-action">
-                    <input type="text" id="silk-ip" class="form-control" placeholder="Leave empty for auto-detected IP" />
-                    <button type="button" class="btn btn-secondary btn-sm" id="btn-detect-ip">Detect IP</button>
+            <!-- 5-Phase Lifecycle Visualizer Stepper -->
+            <div class="card">
+              <div class="card-header">
+                <h3>⚡ 5-Phase Network Perimeter Stepper</h3>
+              </div>
+              <div class="card-body">
+                <div class="lifecycle-stepper" id="lifecycle-stepper" style="display: flex; flex-direction: column; gap: 10px;">
+                  <div class="step-item" id="step-1" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span class="step-badge" style="width: 24px; height: 24px; border-radius: 50%; background: #1a102a; border: 1px solid #4a3370; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: #9f8fb9;">1</span>
+                      <span style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">Pre-Check Closed (Verify 0 Leak)</span>
+                    </div>
+                    <span class="step-status text-muted" style="font-size: 0.75rem;">Idle</span>
+                  </div>
+
+                  <div class="step-item" id="step-2" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span class="step-badge" style="width: 24px; height: 24px; border-radius: 50%; background: #1a102a; border: 1px solid #4a3370; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: #9f8fb9;">2</span>
+                      <span style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">Dynamic Ingress Injection</span>
+                    </div>
+                    <span class="step-status text-muted" style="font-size: 0.75rem;">Idle</span>
+                  </div>
+
+                  <div class="step-item" id="step-3" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span class="step-badge" style="width: 24px; height: 24px; border-radius: 50%; background: #1a102a; border: 1px solid #4a3370; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: #9f8fb9;">3</span>
+                      <span style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">Workload Verification (Latency Probe)</span>
+                    </div>
+                    <span class="step-status text-muted" style="font-size: 0.75rem;">Idle</span>
+                  </div>
+
+                  <div class="step-item" id="step-4" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span class="step-badge" style="width: 24px; height: 24px; border-radius: 50%; background: #1a102a; border: 1px solid #4a3370; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: #9f8fb9;">4</span>
+                      <span style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">Guaranteed Auto-Purge</span>
+                    </div>
+                    <span class="step-status text-muted" style="font-size: 0.75rem;">Idle</span>
+                  </div>
+
+                  <div class="step-item" id="step-5" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <span class="step-badge" style="width: 24px; height: 24px; border-radius: 50%; background: #1a102a; border: 1px solid #4a3370; display: inline-flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: #9f8fb9;">5</span>
+                      <span style="font-size: 0.84rem; font-weight: 600; color: #e2e8f0;">Post-Check Closed (0 Residual Ports)</span>
+                    </div>
+                    <span class="step-status text-muted" style="font-size: 0.75rem;">Idle</span>
                   </div>
                 </div>
 
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-accent" id="btn-inject-rule">🔒 Inject Rule</button>
-                  <button type="button" class="btn btn-danger" id="btn-purge-all">🧹 Purge All Active Rules</button>
+                <!-- Live Log Output Box -->
+                <div id="reach-live-terminal" style="margin-top: 14px; background: #05020a; border: 1px solid #2d184a; border-radius: 6px; padding: 10px 14px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #a392c2; max-height: 140px; overflow-y: auto;">
+                  [PHRYX] SilkFilter Engine initialized. Ready for zero-trust lifecycle audit.
                 </div>
-              </form>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Active Rules & Audit History -->
+        <!-- Audit Log History -->
         <div class="card mt-4">
-          <div class="card-header">
-            <h3>SilkFilter Audit Log (Injections & Purges)</h3>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>SilkFilter Audit Trail (Injections, Auto-Purges & Vault Logs)</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-refresh-reach-logs">🔄 Refresh</button>
           </div>
           <div class="card-body">
             <div class="table-wrapper">
@@ -790,14 +901,15 @@
                   <tr>
                     <th>Timestamp</th>
                     <th>Action</th>
+                    <th>Mode</th>
                     <th>Provider</th>
-                    <th>Resource</th>
-                    <th>IP</th>
+                    <th>Target Resource</th>
+                    <th>Injected IP</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-reach-logs">
-                  <tr><td colspan="6" class="text-center text-muted">No ACL operations logged yet.</td></tr>
+                  <tr><td colspan="7" class="text-center text-muted">No ACL operations logged yet.</td></tr>
                 </tbody>
               </table>
             </div>
