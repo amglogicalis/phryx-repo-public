@@ -1047,23 +1047,107 @@ body {
 
 .onb-steps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
   margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 4-Column Balanced Grid for 4-step flows (never leaves orphan cards) */
+.onb-steps-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1100px) {
+  .onb-steps-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .onb-steps-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 3-Column Balanced Grid for 3-step flows */
+.onb-steps-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 900px) {
+  .onb-steps-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 2-Column Balanced Grid for comparison flows (e.g. Via A vs Via B) */
+.onb-steps-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .onb-steps-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 5-Column Balanced Grid for 5-phase lifecycle */
+.onb-steps-grid-5 {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1200px) {
+  .onb-steps-grid-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .onb-steps-grid-5 {
+    grid-template-columns: 1fr;
+  }
 }
 
 .onb-step-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 18px;
   position: relative;
-  transition: border-color 0.2s, transform 0.2s;
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* CRITICAL: Prevents CSS Grid blowout from code children */
+  overflow: hidden; /* Guarantees code blocks never bleed across card borders */
+  box-sizing: border-box;
 }
 
 .onb-step-card:hover {
   border-color: var(--secondary-aqua);
   transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(128, 60, 255, 0.15);
 }
 
 .onb-step-badge {
@@ -1079,20 +1163,70 @@ body {
   font-size: 0.85rem;
   margin-bottom: 12px;
   box-shadow: 0 0 10px rgba(128, 60, 255, 0.5);
+  flex-shrink: 0;
 }
 
 .onb-step-card h4 {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
+  line-height: 1.35;
 }
 
 .onb-step-card p {
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   color: var(--text-muted);
   line-height: 1.5;
   margin-bottom: 12px;
+  flex-grow: 1;
+}
+
+/* Bulletproof code block styling inside onboarding cards */
+.onb-step-card pre,
+.card-body pre,
+pre {
+  background: #05020a;
+  border: 1px solid rgba(128, 60, 255, 0.25);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: auto;
+  max-width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: #c4b5fd;
+}
+
+.onb-step-card pre code,
+.card-body pre code,
+pre code {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  white-space: pre;
+  display: block;
+  max-width: 100%;
+  word-break: normal;
+}
+
+.onb-step-card pre::-webkit-scrollbar,
+pre::-webkit-scrollbar {
+  height: 5px;
+  background: #0a0515;
+}
+
+.onb-step-card pre::-webkit-scrollbar-thumb,
+pre::-webkit-scrollbar-thumb {
+  background: #4a3370;
+  border-radius: 3px;
+}
+
+.onb-step-card pre::-webkit-scrollbar-thumb:hover,
+pre::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-brand);
 }
 
 /* Practice comparison cards */

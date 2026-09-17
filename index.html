@@ -1143,13 +1143,15 @@
                 <p>La gestión tradicional basada en copiar claves públicas en <code>~/.ssh/authorized_keys</code> genera "key sprawl" permanente: nadie sabe a quién pertenece cada clave, si un ex-empleado sigue teniendo acceso o si una clave privada se ha filtrado. <strong>CaseShell sustituye las claves permanentes por certificados OpenSSH de 15 a 60 minutos firmados digitalmente por una Autoridad Certificadora (CA) propia a $0 infraestructura.</strong></p>
               </div>
 
-              <div class="onb-steps-grid">
+              <div class="onb-steps-grid-4">
                 <div class="onb-step-card">
                   <div class="onb-step-badge">1</div>
                   <h4>Setup Day-0 (Solo 1 vez)</h4>
                   <p>Registra el servidor en la consola o CLI. Phryx genera un snippet de 3 líneas que confía en la clave pública de la CA en <code>/etc/ssh/sshd_config</code>.</p>
-                  <pre><code>echo "ssh-ed25519 AAAAC3..." | sudo tee /etc/ssh/phryx_ca.pub
-echo "TrustedUserCAKeys /etc/ssh/phryx_ca.pub" | sudo tee -a /etc/ssh/sshd_config
+                  <pre><code>echo "ssh-ed25519 AAAAC3..." \
+  | sudo tee /etc/ssh/phryx_ca.pub
+echo "TrustedUserCAKeys /etc/ssh/phryx_ca.pub" \
+  | sudo tee -a /etc/ssh/sshd_config
 sudo systemctl restart ssh</code></pre>
                 </div>
 
@@ -1175,9 +1177,9 @@ sudo systemctl restart ssh</code></pre>
                   <div class="onb-step-badge">4</div>
                   <h4>Expiración Cero Residuo</h4>
                   <p>Transcurrido el tiempo (ej. 30m), el certificado expira criptográficamente en el propio demonio OpenSSH. Cero mantenimiento manual.</p>
-                  <pre><code>Certificate expired at 12:45:00.
-Access denied cryptographically.
-Zero orphan keys remaining.</code></pre>
+                  <pre><code>Certificate expired.
+Access denied by OpenSSH.
+Zero orphan keys.</code></pre>
                 </div>
               </div>
 
@@ -1207,7 +1209,7 @@ Zero orphan keys remaining.</code></pre>
                 <p>Publica cualquier puerto local de tu equipo (ej. <code>localhost:3000</code>) a una URL HTTPS pública accesible globalmente para probar webhooks de Stripe, GitHub, Shopify o demos directas a clientes, sin pagar suscripciones mensuales de ngrok ni ngrok limits.</p>
               </div>
 
-              <div class="onb-steps-grid">
+              <div class="onb-steps-grid-3">
                 <div class="onb-step-card">
                   <div class="onb-step-badge">1</div>
                   <h4>Exclusivo de Entorno Local</h4>
@@ -1221,8 +1223,8 @@ Zero orphan keys remaining.</code></pre>
                   <div class="onb-step-badge">2</div>
                   <h4>Autenticación Obligatoria</h4>
                   <p>Protege tu endpoint con un token de autorización. Cualquier petición entrante deberá suministrar el header <code>X-Phryx-Token: &lt;token&gt;</code> para alcanzar tu servidor.</p>
-                  <pre><code>curl -H "X-Phryx-Token: mi-secreto" \
-  https://tunnel.phryx.terra/xyz</code></pre>
+                  <pre><code>curl -H "X-Phryx-Token: token" \
+  https://tunnel.phryx.terra/x</code></pre>
                 </div>
 
                 <div class="onb-step-card">
@@ -1248,7 +1250,7 @@ Latency: 14ms | Bytes: 412B</code></pre>
                 <p>Permite desplegar proxies cloud efímeros alojados en infraestructura de GitHub Actions para enrutar tráfico residencial/cloud, realizar scraping web, pruebas de penetración o eludir bloqueos geográficos sin alquilar servidores proxy de pago.</p>
               </div>
 
-              <div class="onb-steps-grid">
+              <div class="onb-steps-grid-3">
                 <div class="onb-step-card">
                   <div class="onb-step-badge">1</div>
                   <h4>Despliegue Instantáneo</h4>
@@ -1264,15 +1266,16 @@ Latency: 14ms | Bytes: 412B</code></pre>
                   <h4>Lazarus Relay 24/7</h4>
                   <p>GitHub Actions impone un tope de 6 horas por job. SilkRoute integra <strong>Lazarus Relay</strong>: antes de morir a las 5h 50m, despacha automáticamente el relevo continuo sin cortes.</p>
                   <pre><code>Self-re-executing relay:
-Job N-1 handshakes with Job N
-24/7 uninterrupted gateway.</code></pre>
+Job N-1 handshakes with N
+24/7 continuous gateway.</code></pre>
                 </div>
 
                 <div class="onb-step-card">
                   <div class="onb-step-badge">3</div>
                   <h4>Enrutamiento Global</h4>
                   <p>Conecta tus herramientas favoritas (cURL, Python Requests, Playwright, Scrapy o navegadores) con una simple variable de entorno en tu terminal.</p>
-                  <pre><code>export ALL_PROXY="socks5://user:pass@ip:1080"
+                  <pre><code>export ALL_PROXY=\
+  "socks5://usr:pwd@ip:1080"
 curl https://ifconfig.me</code></pre>
                 </div>
               </div>
@@ -1287,33 +1290,109 @@ curl https://ifconfig.me</code></pre>
             </div>
             <div class="card-body">
               <div class="onb-section-header">
-                <h3>Inyección JIT de IPs en Security Groups y Auto-Purga Garantizada</h3>
-                <p>Las bases de datos y clusters en la nube no deben estar expuestos a <code>0.0.0.0/0</code>. SilkFilter detecta la IP pública efímera del runner de CI/CD, la inyecta temporalmente en el Security Group de AWS o Cloudflare, y <strong>garantiza su purga limpia al finalizar el pipeline</strong>.</p>
+                <h3>Inyección JIT de IPs, Auto-Purga Garantizada y Perímetro Zero-Trust</h3>
+                <p>Las bases de datos y clusters en la nube nunca deben exponerse a <code>0.0.0.0/0</code>. SilkFilter implementa un ciclo de vida Zero-Trust en 5 fases con auto-purga garantizada mediante dos vías arquitectónicas complementarias (Vía A para Cloud Real y Vía B para Zero-Cost Sandbox).</p>
               </div>
 
-              <div class="onb-steps-grid">
+              <!-- VÍA A vs VÍA B COMPARISON -->
+              <h4 style="margin-top: 18px; margin-bottom: 8px; color: var(--secondary-aqua); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>⚡</span> Dos Vías de Arquitectura: Producción vs Sandbox Cero Coste
+              </h4>
+              <div class="onb-steps-grid-2">
                 <div class="onb-step-card">
-                  <div class="onb-step-badge">1</div>
-                  <h4>Detección de IP del Runner</h4>
-                  <p>Al arrancar el pipeline de pruebas o despliegue, el runner consulta su IP de salida dinámica sin intervención manual.</p>
-                  <pre><code>RUNNER_IP=$(curl -s https://ifconfig.me)</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">2</div>
-                  <h4>Inyección de Regla Ingress</h4>
-                  <p>Abre el puerto exacto (ej. 5432 Postgres) únicamente para la IP del runner durante la ejecución de las pruebas.</p>
+                  <div class="onb-step-badge">A</div>
+                  <h4>Vía A — Cloud Provider Nativo (AWS / Cloudflare)</h4>
+                  <p>Inyecta reglas JIT directamente en Security Groups de AWS (<code>aws-sg</code>) o Cloudflare WAF. Requiere credenciales de nube y abre el puerto exclusivamente para el runner de producción.</p>
                   <pre><code>phryx reach add --provider aws-sg \
   --resource sg-0abc123 --port 5432</code></pre>
                 </div>
 
                 <div class="onb-step-card">
+                  <div class="onb-step-badge">B</div>
+                  <h4>Vía B — Zero-Cost Socket Perimeter Target</h4>
+                  <p>Objetivo perimetral de zero-trust sin coste ni credenciales cloud (<code>127.0.0.1:47890</code> o túnel efímero). Valida el ciclo completo de 5 fases, handshakes y purga a $0 de coste.</p>
+                  <pre><code>phryx reach add --provider silkfilter-guard \
+  --resource 127.0.0.1:47890 --port 47890</code></pre>
+                </div>
+              </div>
+
+              <!-- 5-PHASE LIFECYCLE GRID -->
+              <h4 style="margin-top: 24px; margin-bottom: 8px; color: var(--secondary-purple); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🛡️</span> Ciclo de Vida Zero-Trust en 5 Fases Estrictas
+              </h4>
+              <div class="onb-steps-grid-5">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Pre-check Cerrado</h4>
+                  <p>Verifica que el puerto perimetral esté estrictamente cerrado antes de autorizar.</p>
+                  <pre><code>[Pre-Check] 47890: CLOSED
+Refused: perimeter sealed</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>JIT Ingress Injection</h4>
+                  <p>Detecta la IP dinámica del runner e inyecta la regla temporal con TTL.</p>
+                  <pre><code>RUNNER_IP=$(curl -s ifconfig.me)
+Injecting IP: ${RUNNER_IP}/32</code></pre>
+                </div>
+
+                <div class="onb-step-card">
                   <div class="onb-step-badge">3</div>
-                  <h4>Garantía always() Auto-Purge</h4>
-                  <p>El paso de purga usa <code>if: always()</code> en el workflow de Actions. Incluso si el build falla o explota, la regla se elimina sin dejar agujeros.</p>
-                  <pre><code>- name: Purge Ephemeral Ingress
+                  <h4>Workload Handshake</h4>
+                  <p>Ejecuta las pruebas o migraciones con conectividad e integridad verificadas.</p>
+                  <pre><code>[Workload] 200 OK
+Handshake verified (12ms)</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">4</div>
+                  <h4>Guaranteed Auto-Purge</h4>
+                  <p>Purga forzosa de la regla mediante <code>if: always()</code>, incluso si el job falla.</p>
+                  <pre><code>- name: Purge Ingress
   if: always()
-  run: phryx reach purge $RULE_ID</code></pre>
+  run: phryx reach purge $ID</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">5</div>
+                  <h4>Post-check 0 Residuo</h4>
+                  <p>Sondeo final que certifica que el puerto vuelve a quedar herméticamente cerrado.</p>
+                  <pre><code>[Post-Check] 0 ports open
+Perimeter secure (CLOSED)</code></pre>
+                </div>
+              </div>
+
+              <!-- AUDIT TRAIL & INSPECTOR -->
+              <h4 style="margin-top: 24px; margin-bottom: 8px; color: var(--secondary-aqua); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>📜</span> SilkFilter Audit Trail & Inspector
+              </h4>
+              <div class="onb-steps-grid-3">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Registro Auditable Inmutable</h4>
+                  <p>Cada inyección, auto-purga, timestamp y código de estado queda registrado en almacenamiento local y sincronizado en <code>.phryx-storage</code>.</p>
+                  <pre><code>Audit Trail:
+Saved to .phryx-storage/reach/
+Hash: e3b0c44... (SHA-256)</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Inspector Modal & Re-Run</h4>
+                  <p>Haz clic en "Review" en cualquier registro del historial para inspeccionar payloads, latencias y logs. Re-audita o re-ejecuta con 1 solo clic.</p>
+                  <pre><code>Actions:
+[Review Modal] [1-Click Re-Run]
+[Dispatch to CI/CD]</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Higiene y Borrado Seguro</h4>
+                  <p>Permite eliminar registros individuales obsoletos o purgar el historial según tus políticas de cumplimiento normativo (GDPR / SOC2).</p>
+                  <pre><code>Delete Record:
+Purged from audit index.
+Zero orphan traces.</code></pre>
                 </div>
               </div>
             </div>
@@ -1327,11 +1406,44 @@ curl https://ifconfig.me</code></pre>
             </div>
             <div class="card-body">
               <div class="onb-section-header">
-                <h3>Sondeo de latencia y disponibilidad global desde 6 continentes</h3>
-                <p>Ejecuta sondas sintéticas en paralelo desde runners ubicados en US East, West Europe, Southeast Asia, Brazil, Australia y South Africa para auditar CDN, DNS y TTFB sin pagar servicios como Pingdom o New Relic.</p>
+                <h3>Sondeo de latencia, TLS y disponibilidad global desde 6 continentes</h3>
+                <p>Ejecuta sondas sintéticas en paralelo desde runners y edges distribuidos en todo el planeta para auditar CDN, DNS y TTFB sin pagar suscripciones a Pingdom, DataDog o New Relic.</p>
               </div>
-              <pre><code># Probar URL contra toda la matriz global en paralelo
-phryx geo https://mi-api.com --all</code></pre>
+
+              <div class="onb-steps-grid-4">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Matriz de 6 Continentes</h4>
+                  <p>Sondeo simultáneo desde US East (Virginia), Europe West (Fráncfort), Asia Pacific (Tokio), South America (São Paulo), Australia (Sídney) y Africa (Johannesburgo).</p>
+                  <pre><code>phryx geo https://api.io \
+  --regions all --matrix</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Desglose Métrico de 4 Fases</h4>
+                  <p>Medición granular de cada etapa de red: resolución DNS, negociación TCP, handshake TLS/SSL y tiempo hasta el primer byte (TTFB).</p>
+                  <pre><code>DNS: 12ms | TCP: 28ms
+SSL: 45ms | TTFB: 110ms</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Alertas de Umbral & SLA</h4>
+                  <p>Detección visual automática cuando una región geográfica supera los umbrales de SLA (>500ms degradado, >1000ms crítico/timeout).</p>
+                  <pre><code>SLA Status:
+[PASS] 5/6 regions
+[WARN] SAO: 520ms (&gt;500ms)</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">4</div>
+                  <h4>Probe History & Re-Auditoría</h4>
+                  <p>Historial persistente de todas las sondas. Pulsa "Review" para inspeccionar métricas pasadas o "Re-Probar" para relanzar al instante.</p>
+                  <pre><code>History actions:
+[Review] [Re-Probe] [Delete]</code></pre>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -1368,7 +1480,15 @@ phryx geo https://mi-api.com --all</code></pre>
                     </li>
                     <li>
                       <span class="bullet">✔</span>
+                      <div><strong>Usa Vía B para testing y CI local:</strong> Utiliza el Socket Perimeter Guard (<code>127.0.0.1:47890</code>) para pruebas sin coste y sin exponer credenciales cloud.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
                       <div><strong>Garantizar Post-Purge con if: always():</strong> En pipelines CI/CD, asegura que la regla de firewall abierta para el runner se cierre aunque el job falle.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
+                      <div><strong>Verificar 0 Puertos Residuales:</strong> Comprueba siempre la Fase 5 del SilkFilter para asegurar que el perímetro queda sellado tras el pipeline.</div>
                     </li>
                     <li>
                       <span class="bullet">✔</span>
@@ -1398,6 +1518,14 @@ phryx geo https://mi-api.com --all</code></pre>
                     </li>
                     <li>
                       <span class="bullet">✖</span>
+                      <div><strong>Usar credenciales cloud de producción para pruebas unitarias:</strong> No utilices tokens de AWS en tests locales cuando Vía B ofrece un sandbox idéntico a $0.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
+                      <div><strong>Omitir la auto-purga garantizada:</strong> Nunca elimines el paso de purga ni omitas <code>if: always()</code> en tus workflows de integración continua.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✖</span>
                       <div><strong>Túneles locales públicos sin timeout:</strong> No dejes túneles abiertos en segundo plano indefinidamente en tu equipo de desarrollo.</div>
                     </li>
                     <li>
@@ -1406,7 +1534,7 @@ phryx geo https://mi-api.com --all</code></pre>
                     </li>
                     <li>
                       <span class="bullet">✖</span>
-                      <div><strong>Ignorar la restricción de IP:</strong> Si conoces la IP de origen del operador o runner, no dejes el campo de IP vacío.</div>
+                      <div><strong>Ignorar las alertas de SLA geográfico:</strong> No desestimes degradaciones continuadas (>500ms) en continentes clave reportadas por GeoLarva.</div>
                     </li>
                   </ul>
                 </div>
@@ -1425,7 +1553,35 @@ phryx geo https://mi-api.com --all</code></pre>
                 <details class="faq-item">
                   <summary class="faq-summary">¿Tiene algún coste de infraestructura o requiere servidores dedicados?</summary>
                   <div class="faq-content">
-                    <strong>Rotundamente no ($0 de coste).</strong> Todo el ecosistema Phryx aprovecha la computación efímera de GitHub Actions runners y criptografía local OpenSSH. No requiere clústeres de Vault, ni servidores Teleport de pago, ni agentes de fondo persistentes.
+                    <strong>Rotundamente no ($0 de coste).</strong> Todo el ecosistema Phryx aprovecha la computación efímera de GitHub Actions runners, criptografía local OpenSSH y la API de GitHub. No requiere clústeres de HashiCorp Vault, ni servidores Teleport de pago, ni agentes de fondo residentes.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Qué diferencia hay entre Vía A y Vía B en SilkFilter?</summary>
+                  <div class="faq-content">
+                    <strong>Vía A</strong> interactúa con las APIs nativas de proveedores cloud (AWS Security Groups o Cloudflare WAF) y requiere API tokens para abrir y cerrar el firewall de producción. <strong>Vía B</strong> es un objetivo perimetral zero-trust sin coste (<code>127.0.0.1:47890</code> o túnel efímero) diseñado para validar el flujo completo de 5 fases, handshakes de red y auto-purga sin gastar dinero ni requerir credenciales externas.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Por qué aparece "Simulated target: 127.0.0.1:47890 (SilkFilter Zero-Trust Guard)" en la consola?</summary>
+                  <div class="faq-content">
+                    Es el target predeterminado de Vía B. Permite probar el ciclo de vida de inyección efímera JIT, comprobación de puerto cerrado, verificación de handshake y purga automática sin necesidad de configurar una cuenta de AWS o Cloudflare. Cuando configures tus credenciales de nube en Configuración, podrás alternar libremente a Vía A.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Cómo se garantiza que ningún puerto quede abierto si el runner de CI/CD se cancela o explota?</summary>
+                  <div class="faq-content">
+                    Mediante la directiva obligatoria <code>if: always()</code> en GitHub Actions. Incluso si el paso de pruebas unitarias o de integración finaliza con error de código o timeout, el runner ejecuta forzosamente el paso de purga. Además, la Fase 5 efectúa un sondeo activo (post-check) que certifica cero puertos residuales abiertos.
+                  </div>
+                </details>
+
+                <details class="faq-item">
+                  <summary class="faq-summary">¿Cómo funciona el botón "Review" en el Audit Trail y en GeoLarva?</summary>
+                  <div class="faq-content">
+                    El botón <strong>Review</strong> abre un modal interactivo con el registro íntegro almacenado en <code>.phryx-storage</code> o en local. En SilkFilter te muestra los payloads, hashes SHA-256 y marcas temporales de inyección/purga. En GeoLarva te desglosa los tiempos de DNS, TCP, SSL y TTFB de los 6 continentes. Desde dicho modal puedes relanzar la prueba ("Re-Run" / "Re-Probe") o borrar el registro.
                   </div>
                 </details>
 
