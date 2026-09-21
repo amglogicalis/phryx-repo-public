@@ -1626,8 +1626,16 @@ async function loadGateways() {
   renderGateways();
 }
 
+function formatBytes(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 function renderGateways() {
-  const active = state.gateways.find((g) => g.status === 'active');
+  const active = state.gateways.find((g) => g.status === 'active' || g.status === 'running');
   const quickContainer = document.getElementById('route-quick-connect-container');
   const statusPill = document.getElementById('route-status-pill');
   const tbody = document.getElementById('tbody-route-sessions');
@@ -1638,36 +1646,77 @@ function renderGateways() {
   // Active Quick Connect Card
   if (quickContainer) {
     if (!active) {
-      quickContainer.innerHTML = '<div class="empty-state">No active gateway session. Spawn one to generate proxy credentials.</div>';
+      quickContainer.innerHTML = '<div class="empty-state">No active gateway session. Spawn a local daemon or dispatch a cloud runner to start.</div>';
       if (statusPill) {
         statusPill.textContent = 'Idle';
         statusPill.className = 'badge text-muted';
       }
     } else {
+      const isCloud = active.mode === 'cloud';
+      const isLocal = !isCloud;
+      const isRunning = active.status === 'running';
+
       if (statusPill) {
-        statusPill.textContent = 'ONLINE (ACTIVE)';
+        statusPill.textContent = isCloud ? (isRunning ? 'CLOUD RUNNER (ACTIVE)' : 'DISPATCHED') : 'LOCAL DAEMON (ACTIVE)';
         statusPill.className = 'badge text-success';
       }
+
       const rMeta = state.regions.find((r) => r.code === active.region) || { flag: '🌐', name: active.region };
       const expiresTime = new Date(active.expiresAt).toLocaleTimeString();
+      const metrics = active.metrics || { activeConnections: 0, totalConnections: 0, rxBytes: 0, txBytes: 0 };
+
       quickContainer.innerHTML = `
-        <div class="active-gateway-card" style="background: rgba(128, 60, 255, 0.08); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px;">
-          <div class="gw-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div class="active-gateway-card" style="background: rgba(128, 60, 255, 0.08); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 16px;">
+          <div class="gw-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
             <div>
-              <span style="font-size:1.05rem; font-weight:700; color:#fff;">${rMeta.flag} ${rMeta.name}</span>
-              <span class="badge" style="margin-left:8px;">${active.protocol.toUpperCase()}</span>
+              <span style="font-size:1.05rem; font-weight:700; color:#fff;">
+                ${isCloud ? `${rMeta.flag} ${rMeta.name} (Cloud Runner)` : `🖥️ Local Host (${active.bindAddress || '127.0.0.1'})`}
+              </span>
+              <span class="badge" style="margin-left:8px; background: rgba(128, 60, 255, 0.2); color: var(--secondary-aqua);">
+                ${active.protocol.toUpperCase()}
+              </span>
+              <span class="badge" style="margin-left:4px; background: ${isCloud ? 'rgba(6,214,160,0.15)' : 'rgba(128,60,255,0.15)'}; color: ${isCloud ? 'var(--success)' : 'var(--secondary-purple)'};">
+                ${isCloud ? '☁️ Cloud' : '🖥️ Local'}
+              </span>
               ${active.lazarusEnabled ? '<span class="badge" style="background:rgba(6,214,160,0.15); color:var(--success); margin-left:4px;">🔄 Lazarus 24/7</span>' : ''}
+              ${active.dnsRemoteOnly ? '<span class="badge" style="background:rgba(255,209,102,0.15); color:#ffd166; margin-left:4px;">🛡️ Remote DNS</span>' : ''}
             </div>
-            <button class="btn btn-danger btn-xs" onclick="terminateGateway('${active.id}')">🛑 Terminate</button>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-secondary btn-xs" id="btn-test-gw-${active.id}" onclick="testGateway('${active.id}')">🧪 Test Connection</button>
+              <button class="btn btn-danger btn-xs" onclick="terminateGateway('${active.id}')">🛑 Terminate</button>
+            </div>
           </div>
 
           <div class="info-row"><span class="label">SOCKS5 URI:</span><code class="code-pill">${active.socks5Url}</code></div>
           <div class="info-row"><span class="label">HTTP URI:</span><code class="code-pill">${active.httpUrl}</code></div>
           <div class="info-row"><span class="label">Time Remaining:</span><span class="value text-warning">Expires at ${expiresTime} (${active.durationMinutes}m lease)</span></div>
+          ${active.clientWhitelist && active.clientWhitelist.length > 0 ? `<div class="info-row"><span class="label">ACL Whitelist:</span><span class="value">${active.clientWhitelist.join(', ')}</span></div>` : ''}
+          ${active.edgeWorkloadUrl ? `<div class="info-row"><span class="label">Edge Workload:</span><code class="code-pill">${active.edgeWorkloadUrl}</code></div>` : ''}
+          ${active.runUrl ? `<div class="info-row"><span class="label">Actions Run:</span><a href="${active.runUrl}" target="_blank" style="color:var(--secondary-aqua); text-decoration:underline;">View GitHub Actions Workflow ↗</a></div>` : ''}
 
-          <div class="gw-actions-row mt-3" style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 12px;">
-            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.socks5Url}'); alert('SOCKS5 URI copiada!')">📋 Copy SOCKS5</button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.httpUrl}'); alert('HTTP URI copiada!')">📋 Copy HTTP</button>
+          <!-- Live Telemetry Counters -->
+          <div class="telemetry-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; margin-bottom: 12px; background: rgba(0, 0, 0, 0.25); padding: 10px; border-radius: 6px; border: 1px solid rgba(128, 60, 255, 0.15);">
+            <div style="text-align: center;">
+              <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Conn</span>
+              <strong style="font-size: 1.1rem; color: var(--success);" id="metric-active-conn">${metrics.activeConnections || 0}</strong>
+            </div>
+            <div style="text-align: center;">
+              <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Total Conn</span>
+              <strong style="font-size: 1.1rem; color: #fff;" id="metric-total-conn">${metrics.totalConnections || 0}</strong>
+            </div>
+            <div style="text-align: center;">
+              <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Traffic RX</span>
+              <strong style="font-size: 1.1rem; color: var(--secondary-aqua);" id="metric-rx-bytes">${formatBytes(metrics.rxBytes || 0)}</strong>
+            </div>
+            <div style="text-align: center;">
+              <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Traffic TX</span>
+              <strong style="font-size: 1.1rem; color: var(--secondary-purple);" id="metric-tx-bytes">${formatBytes(metrics.txBytes || 0)}</strong>
+            </div>
+          </div>
+
+          <div class="gw-actions-row mt-3" style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;">
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.socks5Url}'); alert('SOCKS5 URI copiada al portapapeles!')">📋 Copy SOCKS5</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.httpUrl}'); alert('HTTP URI copiada al portapapeles!')">📋 Copy HTTP</button>
             <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.curlCommand}'); alert('cURL command copiado!')">💻 Copy cURL</button>
             <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('export ALL_PROXY=\\'${active.socks5Url}\\''); alert('Export env copiado!')">🐚 Copy Terminal Export</button>
           </div>
@@ -1676,26 +1725,32 @@ function renderGateways() {
     }
   }
 
-  // Sessions Table
+  // Sessions Table (9 columns)
   if (tbody) {
     if (state.gateways.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>';
     } else {
       tbody.innerHTML = state.gateways
         .map((s) => {
+          const isCloud = s.mode === 'cloud';
           const rMeta = state.regions.find((r) => r.code === s.region) || { flag: '🌐', name: s.region };
-          const isAct = s.status === 'active';
+          const isAct = s.status === 'active' || s.status === 'running';
+          const locStr = isCloud ? `${rMeta.flag} ${rMeta.name}` : `🖥️ ${s.bindAddress || '127.0.0.1'}`;
           return `
             <tr>
               <td><code>${s.id}</code></td>
-              <td>${rMeta.flag} ${s.region}</td>
+              <td><span class="badge ${isCloud ? 'text-success' : 'text-muted'}">${isCloud ? 'CLOUD' : 'LOCAL'}</span></td>
+              <td>${locStr}</td>
               <td><span class="badge">${s.protocol.toUpperCase()}</span></td>
               <td><code>${s.ip}:${s.socksPort}</code></td>
               <td>${s.lazarusEnabled ? '<span class="text-success">✔ 24/7 Relay</span>' : '<span class="text-muted">Single</span>'}</td>
               <td>${new Date(s.expiresAt).toLocaleTimeString()}</td>
               <td><span class="badge ${isAct ? 'text-success' : 'text-muted'}">${s.status.toUpperCase()}</span></td>
               <td>
-                ${isAct ? `<button class="btn btn-danger btn-xs" onclick="terminateGateway('${s.id}')">Stop</button>` : '<span class="text-muted">—</span>'}
+                <div style="display:flex; gap:4px;">
+                  ${isAct ? `<button class="btn btn-secondary btn-xs" onclick="testGateway('${s.id}')">🧪 Test</button>` : ''}
+                  ${isAct ? `<button class="btn btn-danger btn-xs" onclick="terminateGateway('${s.id}')">Stop</button>` : '<span class="text-muted">—</span>'}
+                </div>
               </td>
             </tr>
           `;
@@ -1704,6 +1759,36 @@ function renderGateways() {
     }
   }
 }
+
+async function testGateway(id) {
+  const btn = document.getElementById(`btn-test-gw-${id}`);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Probing...';
+  }
+
+  try {
+    if (state.isLocalServer) {
+      const res = await fetch(`${state.apiBase}/api/route/test/${id}`, { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        alert(`✔ Test exitoso:\n${data.message}\nLatencia: ${data.latencyMs}ms | Estado HTTP: ${data.httpStatus || 200}`);
+      } else {
+        alert(`✖ Error probando gateway:\n${data.message}`);
+      }
+    } else {
+      alert(`✔ Gateway session [${id}] activa en GitHub Actions.\nConsulta el estado y logs en vivo desde la pestaña de Actions.`);
+    }
+  } catch (err) {
+    alert(`Error de conexión con el test de gateway: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '🧪 Test Connection';
+    }
+  }
+}
+window.testGateway = testGateway;
 
 async function terminateGateway(id) {
   if (state.isLocalServer) {
@@ -3337,82 +3422,202 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     clearAllReachLogs();
   });
 
-  // SilkRoute Form
+  // Mode Switcher for SilkRoute
+  document.getElementById('btn-route-mode-local')?.addEventListener('click', () => {
+    const modeInput = document.getElementById('route-mode');
+    if (modeInput) modeInput.value = 'local';
+    const btnLocal = document.getElementById('btn-route-mode-local');
+    const btnCloud = document.getElementById('btn-route-mode-cloud');
+    if (btnLocal) btnLocal.className = 'btn btn-primary flex-1';
+    if (btnCloud) btnCloud.className = 'btn btn-secondary flex-1';
+
+    const grpBind = document.getElementById('grp-route-bind');
+    const grpRegion = document.getElementById('grp-route-region');
+    const grpEdge = document.getElementById('grp-route-edge');
+    if (grpBind) grpBind.style.display = 'block';
+    if (grpRegion) grpRegion.style.display = 'none';
+    if (grpEdge) grpEdge.style.display = 'none';
+
+    const badge = document.getElementById('route-mode-badge');
+    if (badge) {
+      badge.textContent = '🖥️ Mode: Local Daemon';
+      badge.style.color = 'var(--secondary-aqua)';
+    }
+
+    const btnSpawn = document.getElementById('btn-spawn-gateway');
+    if (btnSpawn) btnSpawn.textContent = '🚀 Spawn Local Gateway';
+  });
+
+  document.getElementById('btn-route-mode-cloud')?.addEventListener('click', () => {
+    const modeInput = document.getElementById('route-mode');
+    if (modeInput) modeInput.value = 'cloud';
+    const btnLocal = document.getElementById('btn-route-mode-local');
+    const btnCloud = document.getElementById('btn-route-mode-cloud');
+    if (btnLocal) btnLocal.className = 'btn btn-secondary flex-1';
+    if (btnCloud) btnCloud.className = 'btn btn-primary flex-1';
+
+    const grpBind = document.getElementById('grp-route-bind');
+    const grpRegion = document.getElementById('grp-route-region');
+    const grpEdge = document.getElementById('grp-route-edge');
+    if (grpBind) grpBind.style.display = 'none';
+    if (grpRegion) grpRegion.style.display = 'block';
+    if (grpEdge) grpEdge.style.display = 'block';
+
+    const badge = document.getElementById('route-mode-badge');
+    if (badge) {
+      badge.textContent = '☁️ Mode: Cloud Runner (Actions)';
+      badge.style.color = 'var(--success)';
+    }
+
+    const btnSpawn = document.getElementById('btn-spawn-gateway');
+    if (btnSpawn) btnSpawn.textContent = '☁️ Dispatch Cloud Runner';
+  });
+
+  // SilkRoute Form Submission
   document.getElementById('route-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const region = document.getElementById('route-region').value;
-    const protocol = document.getElementById('route-protocol').value;
-    const durationMinutes = Number(document.getElementById('route-duration').value) || 60;
+    const mode = document.getElementById('route-mode')?.value || 'local';
+    const region = document.getElementById('route-region')?.value || 'west-europe';
+    const bindAddress = document.getElementById('route-bind')?.value || '127.0.0.1';
+    const protocol = document.getElementById('route-protocol')?.value || 'dual';
+    const durationMinutes = Number(document.getElementById('route-duration')?.value) || 60;
+    const socksPort = Number(document.getElementById('route-socks-port')?.value) || 1080;
+    const httpPort = Number(document.getElementById('route-http-port')?.value) || 8080;
+    const clientWhitelistRaw = document.getElementById('route-whitelist')?.value || '';
+    const clientWhitelist = clientWhitelistRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    const dnsRemoteOnly = document.getElementById('route-dns-remote')?.checked ?? true;
     const lazarusRelay = document.getElementById('route-lazarus')?.checked ?? true;
-    const username = document.getElementById('route-user').value || `phryx_${Math.random().toString(36).substring(2, 7)}`;
-    const password = document.getElementById('route-pass').value || Math.random().toString(36).substring(2, 9);
+    const edgeWorkloadUrl = document.getElementById('route-edge-url')?.value?.trim() || '';
+    const username = document.getElementById('route-user')?.value || `phryx_${Math.random().toString(36).substring(2, 7)}`;
+    const password = document.getElementById('route-pass')?.value || Math.random().toString(36).substring(2, 9);
     const btn = document.getElementById('btn-spawn-gateway');
 
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Launching Gateway...';
+      btn.textContent = mode === 'cloud' ? 'Dispatching Runner...' : 'Launching Gateway...';
     }
 
-    const payload = {
-      region,
-      protocol,
-      durationMinutes,
-      lazarusRelay,
-      auth: { username, password },
-      socksPort: 1080,
-      httpPort: 8080,
-    };
+    if (mode === 'local') {
+      if (state.isLocalServer) {
+        const payload = {
+          mode: 'local',
+          bindAddress,
+          protocol,
+          durationMinutes,
+          socksPort,
+          httpPort,
+          clientWhitelist: clientWhitelist.length > 0 ? clientWhitelist : undefined,
+          dnsRemoteOnly,
+          lazarusRelay,
+          auth: { username, password },
+        };
 
-    if (state.isLocalServer) {
-      try {
-        const res = await fetch(`${state.apiBase}/api/route/spawn`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          const session = await res.json();
-          state.gateways.unshift(session);
+        try {
+          const res = await fetch(`${state.apiBase}/api/route/spawn`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const session = await res.json();
+            state.gateways.unshift(session);
+            alert(`✔ Gateway local iniciado con éxito en ${bindAddress} (SOCKS: ${socksPort}, HTTP: ${httpPort}).`);
+          } else {
+            const errData = await res.json();
+            alert(`Error iniciando gateway local: ${errData.error || res.statusText}`);
+          }
+        } catch (err) {
+          alert('Error de conexión con el backend local: ' + err.message);
         }
-      } catch (err) {
-        alert('Error launching local gateway: ' + err.message);
+      } else {
+        alert(`⚠️ Modo Local Daemon seleccionado:\n\nPara arrancar el proxy en tu máquina física (${bindAddress}), inicia la consola desde tu terminal con:\n  phryx console\no ejecuta directamente:\n  phryx route spawn --bind ${bindAddress} --socks-port ${socksPort} --http-port ${httpPort}\n\n💡 Si prefieres desplegar un proxy remoto a $0 de coste en la nube sin software local, activa la pestaña '☁️ Cloud Runner (GitHub Actions)'.`);
       }
     } else {
-      // Online cloud mode: generate live credentials and record session
-      const id = `route_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      const ip = region === 'west-europe' ? '20.105.120.44' : region === 'southeast-asia' ? '20.27.18.91' : '52.167.89.12';
-      const socks5Url = `socks5://${username}:${password}@${ip}:1080`;
-      const httpUrl = `http://${username}:${password}@${ip}:8080`;
-      const session = {
-        id,
-        region,
-        protocol,
-        ip,
-        socksPort: 1080,
-        httpPort: 8080,
-        socks5Url,
-        httpUrl,
-        username,
-        password,
-        startedAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + durationMinutes * 60000).toISOString(),
-        durationMinutes,
-        lazarusEnabled: lazarusRelay,
-        relayCount: 0,
-        status: 'active',
-        curlCommand: `curl -x socks5h://${username}:${password}@${ip}:1080 https://api.ipify.org?format=json`,
-        envSnippet: `export ALL_PROXY="${socks5Url}"\nexport HTTPS_PROXY="${httpUrl}"`,
+      // Cloud Runner Mode (GitHub Actions)
+      if (!state.ghToken) {
+        alert('⚠️ Conexión con GitHub requerida:\n\nPor favor, introduce tu GitHub Personal Access Token (PAT) en la barra superior para despachar runners en la nube de GitHub Actions a $0 de coste.');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '☁️ Dispatch Cloud Runner';
+        }
+        return;
+      }
+
+      const sessionId = `route_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const payload = {
+        ref: 'main',
+        inputs: {
+          session_id: sessionId,
+          region,
+          protocol,
+          duration_minutes: String(durationMinutes),
+          lazarus_relay: lazarusRelay ? 'true' : 'false',
+          username,
+          password,
+          edge_workload_url: edgeWorkloadUrl,
+        },
       };
-      state.gateways.unshift(session);
-      localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
-      if (state.ghToken) {
-        vaultClient.setFile(`route-sessions/${session.id}.json`, session, `phryx(route): save session ${session.id}`);
+
+      try {
+        const dispatchRes = await fetch(
+          `https://api.github.com/repos/${state.vaultRepo}/actions/workflows/phryx-silkroute.yml/dispatches`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `token ${state.ghToken}`,
+              Accept: 'application/vnd.github.v3+json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+
+        if (dispatchRes.status === 204 || dispatchRes.ok) {
+          const runUrl = `https://github.com/${state.vaultRepo}/actions`;
+          const scheme = dnsRemoteOnly ? 'socks5h' : 'socks5';
+          const session = {
+            id: sessionId,
+            mode: 'cloud',
+            region,
+            protocol,
+            ip: `runner.${region}.cloud (initializing)`,
+            socksPort,
+            httpPort,
+            socks5Url: `${scheme}://${username}:${password}@runner.${region}.cloud:${socksPort}`,
+            httpUrl: `http://${username}:${password}@runner.${region}.cloud:${httpPort}`,
+            username,
+            password,
+            startedAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + durationMinutes * 60000).toISOString(),
+            durationMinutes,
+            lazarusEnabled: lazarusRelay,
+            relayCount: 0,
+            status: 'running',
+            runUrl,
+            clientWhitelist,
+            dnsRemoteOnly,
+            edgeWorkloadUrl,
+            curlCommand: `curl -x ${scheme}://${username}:${password}@<runner_ip>:${socksPort} https://api.ipify.org`,
+            envSnippet: `export ALL_PROXY="${scheme}://${username}:${password}@<runner_ip>:${socksPort}"`,
+          };
+
+          state.gateways.unshift(session);
+          localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+          vaultClient.setFile(`route-sessions/${session.id}.json`, session, `phryx(route): dispatch cloud session ${session.id}`);
+
+          alert(`✔ Cloud Runner despachado con éxito en ${region.toUpperCase()}!\n\nSe está levantando una máquina virtual efímera en GitHub Actions.\nPuedes seguir la ejecución en directo en:\n${runUrl}`);
+        } else {
+          const errText = await dispatchRes.text();
+          alert(`Error despachando runner en GitHub Actions (${dispatchRes.status}):\n${errText.slice(0, 150)}`);
+        }
+      } catch (err) {
+        alert('Error conectando con la API de GitHub: ' + err.message);
       }
     }
 
     if (btn) {
       btn.disabled = false;
-      btn.textContent = '🚀 Spawn Cloud Gateway';
+      btn.textContent = mode === 'cloud' ? '☁️ Dispatch Cloud Runner' : '🚀 Spawn Local Gateway';
     }
 
     renderGateways();
@@ -3421,11 +3626,27 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
 
   // Copy Route CLI Command
   document.getElementById('btn-copy-route-cli')?.addEventListener('click', () => {
-    const region = document.getElementById('route-region').value;
-    const protocol = document.getElementById('route-protocol').value;
-    const duration = document.getElementById('route-duration').value;
+    const mode = document.getElementById('route-mode')?.value || 'local';
+    const region = document.getElementById('route-region')?.value || 'west-europe';
+    const bindAddress = document.getElementById('route-bind')?.value || '127.0.0.1';
+    const protocol = document.getElementById('route-protocol')?.value || 'dual';
+    const duration = document.getElementById('route-duration')?.value || '60';
+    const socksPort = document.getElementById('route-socks-port')?.value || '1080';
+    const httpPort = document.getElementById('route-http-port')?.value || '8080';
+    const whitelist = document.getElementById('route-whitelist')?.value?.trim();
+    const dnsRemote = document.getElementById('route-dns-remote')?.checked ? ' --dns-remote' : '';
     const lazarus = document.getElementById('route-lazarus')?.checked ? ' --lazarus' : '';
-    const cmd = `phryx route spawn --region ${region} --protocol ${protocol} --duration ${duration}${lazarus}`;
+    const edgeUrl = document.getElementById('route-edge-url')?.value?.trim();
+
+    let cmd = `phryx route spawn --mode ${mode} --protocol ${protocol} --duration ${duration}${lazarus}${dnsRemote}`;
+    if (mode === 'local') {
+      cmd += ` --bind ${bindAddress} --socks-port ${socksPort} --http-port ${httpPort}`;
+    } else {
+      cmd += ` --region ${region}`;
+      if (edgeUrl) cmd += ` --edge-url ${edgeUrl}`;
+    }
+    if (whitelist) cmd += ` --whitelist ${whitelist}`;
+
     copySnippetText(cmd);
     alert(`Comando CLI copiado al portapapeles:\n${cmd}`);
   });

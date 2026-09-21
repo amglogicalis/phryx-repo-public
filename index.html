@@ -998,11 +998,24 @@
           <div class="card">
             <div class="card-header">
               <h3><span class="icon">🛸</span> Spawn Ephemeral Gateway</h3>
+              <span class="badge" id="route-mode-badge" style="background: rgba(128, 60, 255, 0.15); color: var(--secondary-aqua);">🖥️ Mode: Local Daemon</span>
             </div>
             <div class="card-body">
+              <!-- Mode Switcher -->
+              <div class="btn-group" style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <button type="button" class="btn btn-primary flex-1" id="btn-route-mode-local" style="font-size: 0.82rem; padding: 8px 12px;">
+                  🖥️ Local Daemon (127.0.0.1)
+                </button>
+                <button type="button" class="btn btn-secondary flex-1" id="btn-route-mode-cloud" style="font-size: 0.82rem; padding: 8px 12px;">
+                  ☁️ Cloud Runner (GitHub Actions)
+                </button>
+              </div>
+              <input type="hidden" id="route-mode" value="local" />
+
               <form id="route-form" class="form-vertical">
-                <div class="form-group">
-                  <label for="route-region">Target Exit Region</label>
+                <!-- Cloud-Only Region Field -->
+                <div class="form-group" id="grp-route-region" style="display: none;">
+                  <label for="route-region">Target Exit Region (Cloud Datacenter)</label>
                   <select id="route-region" class="form-control">
                     <option value="west-europe">🇳🇱 Western Europe (Amsterdam)</option>
                     <option value="east-us">🇺🇸 US East (Virginia)</option>
@@ -1011,7 +1024,17 @@
                     <option value="australia-east">🇦🇺 Australia East (Sydney)</option>
                     <option value="south-africa">🇿🇦 South Africa (Johannesburg)</option>
                   </select>
-                  <span class="help-text">Egress IP will be provisioned in the chosen geographic cloud datacenter.</span>
+                  <span class="help-text">Egress IP provisioned directly in the chosen geographic cloud datacenter via Actions runner.</span>
+                </div>
+
+                <!-- Local-Only Bind Address Field -->
+                <div class="form-group" id="grp-route-bind">
+                  <label for="route-bind">Bind Address (Network Interface)</label>
+                  <select id="route-bind" class="form-control">
+                    <option value="127.0.0.1">🔒 127.0.0.1 (Localhost Only — Safe)</option>
+                    <option value="0.0.0.0">🌐 0.0.0.0 (All Interfaces — Accessible from LAN & Docker)</option>
+                  </select>
+                  <span class="help-text">Choose whether the proxy listens strictly on loopback or accepts LAN/Docker connections.</span>
                 </div>
 
                 <div class="form-row">
@@ -1019,30 +1042,67 @@
                     <label for="route-protocol">Proxy Protocol</label>
                     <select id="route-protocol" class="form-control">
                       <option value="dual">Dual (SOCKS5 + HTTP)</option>
-                      <option value="socks5">SOCKS5 Only (Port 1080)</option>
-                      <option value="http">HTTP CONNECT (Port 8080)</option>
+                      <option value="socks5">SOCKS5 Only</option>
+                      <option value="http">HTTP CONNECT Only</option>
                     </select>
                   </div>
                   <div class="form-group flex-1">
                     <label for="route-duration">Duration (Minutes)</label>
                     <input type="number" id="route-duration" class="form-control" value="60" min="15" max="360" />
-                    <span class="help-text">Max 360m (6 hours) per runner.</span>
+                    <span class="help-text">Max 360m (6 hours).</span>
                   </div>
                 </div>
 
-                <!-- Lazarus Relay 24/7 Option -->
-                <div class="form-group" style="background: rgba(128, 60, 255, 0.08); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-                  <label class="checkbox-label" style="display: flex; align-items: center; gap: 10px; cursor: pointer; margin: 0;">
-                    <input type="checkbox" id="route-lazarus" checked style="width: 18px; height: 18px; accent-color: var(--primary-brand);" />
-                    <div>
-                      <span style="font-weight: 600; color: var(--text-primary); font-size: 0.88rem;">🔄 Lazarus Relay (24/7 Continuous Handover)</span>
-                      <span class="help-text" style="display: block; font-size: 0.74rem; color: var(--text-muted); margin-top: 2px;">
-                        Before runner reaches 6h timeout, automatically dispatches next cycle keeping proxy alive indefinitely.
-                      </span>
-                    </div>
-                  </label>
+                <!-- Custom Ports Configuration -->
+                <div class="form-row">
+                  <div class="form-group flex-1">
+                    <label for="route-socks-port">SOCKS5 Port</label>
+                    <input type="number" id="route-socks-port" class="form-control" value="1080" min="1024" max="65535" />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="route-http-port">HTTP Proxy Port</label>
+                    <input type="number" id="route-http-port" class="form-control" value="8080" min="1024" max="65535" />
+                  </div>
                 </div>
 
+                <!-- Security & ACL Whitelist -->
+                <div class="form-group">
+                  <label for="route-whitelist">Client IP Whitelist (Optional)</label>
+                  <input type="text" id="route-whitelist" class="form-control" placeholder="e.g. 127.0.0.1, 192.168.1.5 (leave blank for all)" />
+                  <span class="help-text">Comma-separated list of client IPs allowed to route traffic through this gateway.</span>
+                </div>
+
+                <!-- Cloud Edge Workload Probe -->
+                <div class="form-group" id="grp-route-edge" style="display: none;">
+                  <label for="route-edge-url">Edge Workload Probe (Optional URL)</label>
+                  <input type="url" id="route-edge-url" class="form-control" placeholder="https://api.ipify.org or target to scrape at edge" />
+                  <span class="help-text">Cloud runner will execute a direct probe from the edge and report latency & status to vault.</span>
+                </div>
+
+                <!-- Advanced Toggles -->
+                <div class="form-row" style="gap: 12px; margin-top: 4px;">
+                  <div class="form-group flex-1" style="background: rgba(128, 60, 255, 0.06); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                      <input type="checkbox" id="route-dns-remote" checked style="accent-color: var(--primary-brand);" />
+                      <div>
+                        <span style="font-weight: 600; font-size: 0.82rem; color: var(--text-primary);">🛡️ DNS Leak Protection</span>
+                        <span class="help-text" style="display: block; font-size: 0.72rem; margin-top: 2px;">Force socks5h:// remote DNS lookup</span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div class="form-group flex-1" style="background: rgba(128, 60, 255, 0.06); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin: 0;">
+                      <input type="checkbox" id="route-lazarus" checked style="accent-color: var(--primary-brand);" />
+                      <div>
+                        <span style="font-weight: 600; font-size: 0.82rem; color: var(--text-primary);">🔄 Lazarus Relay 24/7</span>
+                        <span class="help-text" style="display: block; font-size: 0.72rem; margin-top: 2px;">Auto-handover at 5h 50m</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Credentials -->
                 <div class="form-row">
                   <div class="form-group flex-1">
                     <label for="route-user">Username (Optional)</label>
@@ -1056,7 +1116,7 @@
 
                 <div class="form-actions">
                   <button type="submit" class="btn btn-primary" id="btn-spawn-gateway">
-                    🚀 Spawn Cloud Gateway
+                    🚀 Spawn Local Gateway
                   </button>
                   <button type="button" class="btn btn-secondary" id="btn-copy-route-cli">
                     📋 Copy CLI Command
@@ -1069,12 +1129,12 @@
           <!-- Active Gateway Quick Connect Card -->
           <div class="card">
             <div class="card-header">
-              <h3><span class="icon">⚡</span> Quick Connect & Status</h3>
+              <h3><span class="icon">⚡</span> Quick Connect & Live Telemetry</h3>
               <span class="badge" id="route-status-pill">Ready</span>
             </div>
             <div class="card-body">
               <div id="route-quick-connect-container">
-                <div class="empty-state">No active gateway session. Spawn one to generate proxy credentials.</div>
+                <div class="empty-state">No active gateway session. Spawn a local daemon or dispatch a cloud runner to start.</div>
               </div>
             </div>
           </div>
@@ -1092,17 +1152,18 @@
                 <thead>
                   <tr>
                     <th>Session ID</th>
-                    <th>Region</th>
+                    <th>Mode</th>
+                    <th>Region / Bind</th>
                     <th>Protocol</th>
                     <th>Proxy Endpoint</th>
                     <th>Lazarus 24/7</th>
                     <th>Expires</th>
                     <th>Status</th>
-                    <th>Action</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-route-sessions">
-                  <tr><td colspan="8" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>
+                  <tr><td colspan="9" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1246,37 +1307,73 @@ Latency: 14ms | Bytes: 412B</code></pre>
             </div>
             <div class="card-body">
               <div class="onb-section-header">
-                <h3>Pasarela Proxy Dual SOCKS5 y HTTP CONNECT a $0</h3>
-                <p>Permite desplegar proxies cloud efímeros alojados en infraestructura de GitHub Actions para enrutar tráfico residencial/cloud, realizar scraping web, pruebas de penetración o eludir bloqueos geográficos sin alquilar servidores proxy de pago.</p>
+                <h3>Pasarela Proxy Dual SOCKS5 y HTTP CONNECT a $0: Local Daemon vs Cloud Runner</h3>
+                <p>Despliega pasarelas de salida efímeras en tu propia máquina (Local Daemon) o directamente en la nube global mediante runners efímeros de GitHub Actions (Cloud Runner) para scraping web, pruebas de penetración, elusión de geobloqueos o túneles de desarrollo sin pagar suscripciones mensuales de proxies.</p>
               </div>
 
-              <div class="onb-steps-grid-3">
+              <!-- DUAL MODE COMPARISON -->
+              <h4 style="margin-top: 18px; margin-bottom: 8px; color: var(--secondary-aqua); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>⚡</span> Dos Modos de Ejecución Transparentes
+              </h4>
+              <div class="onb-steps-grid-2">
                 <div class="onb-step-card">
                   <div class="onb-step-badge">1</div>
-                  <h4>Despliegue Instantáneo</h4>
-                  <p>Arranca un gateway en la región deseada seleccionando protocolo SOCKS5 (RFC 1928), HTTP CONNECT o dual con credenciales generadas al vuelo.</p>
-                  <pre><code>phryx route spawn \
-  --region west-europe \
-  --protocol dual \
-  --duration 60</code></pre>
+                  <h4>🖥️ Local Daemon (127.0.0.1 / 0.0.0.0)</h4>
+                  <p>Arranca proxies TCP nativos en tu ordenador físico. Permite enlazar a <code>0.0.0.0</code> para dar servicio a contenedores Docker o equipos en tu red local (LAN), con lista blanca de IPs clientes y medición de bytes RX/TX en vivo.</p>
+                  <pre><code>phryx route spawn --mode local \
+  --bind 127.0.0.1 \
+  --socks-port 1080 --http-port 8080 \
+  --whitelist 127.0.0.1</code></pre>
                 </div>
 
                 <div class="onb-step-card">
                   <div class="onb-step-badge">2</div>
+                  <h4>☁️ Cloud Actions Runner (GitHub Actions)</h4>
+                  <p>Despacha una máquina virtual en los centros de datos de Azure en 6 continentes vía <code>workflow_dispatch</code>. Sal a internet con la IP del runner o ejecuta probes directamente en el edge.</p>
+                  <pre><code>phryx route dispatch \
+  --region west-europe \
+  --edge-url https://api.ipify.org \
+  --token $GH_TOKEN</code></pre>
+                </div>
+              </div>
+
+              <!-- ADVANCED FEATURES GRID -->
+              <h4 style="margin-top: 24px; margin-bottom: 8px; color: var(--secondary-purple); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🛡️</span> Parámetros Avanzados y Telemetría en Tiempo Real
+              </h4>
+              <div class="onb-steps-grid-4">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">A</div>
+                  <h4>DNS Leak Protection</h4>
+                  <p>Fuerza la resolución remota de nombres DNS a través del proxy usando <code>socks5h://</code>, impidiendo que el ISP local intercepte los dominios solicitados.</p>
+                  <pre><code>curl -x socks5h://usr:pwd@ip:1080 \
+  https://ifconfig.me</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">B</div>
+                  <h4>Client IP Whitelist</h4>
+                  <p>Restringe qué direcciones IP pueden cursar tráfico a través de la pasarela para impedir accesos no autorizados si el proxy se expone a la red.</p>
+                  <pre><code>--whitelist 127.0.0.1,192.168.1.42
+Rechaza IPs no autorizadas.</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">C</div>
                   <h4>Lazarus Relay 24/7</h4>
-                  <p>GitHub Actions impone un tope de 6 horas por job. SilkRoute integra <strong>Lazarus Relay</strong>: antes de morir a las 5h 50m, despacha automáticamente el relevo continuo sin cortes.</p>
+                  <p>GitHub Actions limita a 6 horas por runner. Lazarus Relay detecta las 5h 50m y despacha el relevo automático sin cortes de servicio.</p>
                   <pre><code>Self-re-executing relay:
 Job N-1 handshakes with N
 24/7 continuous gateway.</code></pre>
                 </div>
 
                 <div class="onb-step-card">
-                  <div class="onb-step-badge">3</div>
-                  <h4>Enrutamiento Global</h4>
-                  <p>Conecta tus herramientas favoritas (cURL, Python Requests, Playwright, Scrapy o navegadores) con una simple variable de entorno en tu terminal.</p>
-                  <pre><code>export ALL_PROXY=\
-  "socks5://usr:pwd@ip:1080"
-curl https://ifconfig.me</code></pre>
+                  <div class="onb-step-badge">D</div>
+                  <h4>Live Telemetry & Test</h4>
+                  <p>Monitorea conexiones activas concurrentes y tráfico total RX/TX en vivo. Prueba la latencia real con el botón "Test Connection".</p>
+                  <pre><code>Active: 2 | Total: 18
+RX: 142 KB | TX: 512 KB
+Latency: 12ms (HTTP 200)</code></pre>
                 </div>
               </div>
             </div>
