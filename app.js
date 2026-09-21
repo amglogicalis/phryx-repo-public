@@ -1634,6 +1634,182 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+function copySnippetText(text) {
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  const el = document.createElement('textarea');
+  el.value = text;
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
+}
+window.copySnippetText = copySnippetText;
+
+state.routeFilter = 'all';
+
+function setRouteFilter(mode) {
+  state.routeFilter = mode;
+  const btnAll = document.getElementById('btn-route-filter-all');
+  const btnAct = document.getElementById('btn-route-filter-active');
+  const btnHist = document.getElementById('btn-route-filter-history');
+  if (btnAll) btnAll.className = `btn btn-xs ${mode === 'all' ? 'btn-primary' : 'btn-secondary'}`;
+  if (btnAct) btnAct.className = `btn btn-xs ${mode === 'active' ? 'btn-primary' : 'btn-secondary'}`;
+  if (btnHist) btnHist.className = `btn btn-xs ${mode === 'history' ? 'btn-primary' : 'btn-secondary'}`;
+  renderGateways();
+}
+window.setRouteFilter = setRouteFilter;
+
+function showGatewayDetails(id) {
+  const s = state.gateways.find((g) => g.id === id);
+  if (!s) return;
+
+  const inspector = document.getElementById('route-session-inspector');
+  if (!inspector) return;
+
+  const isCloud = s.mode === 'cloud';
+  const rMeta = state.regions.find((r) => r.code === s.region) || { flag: '🌐', name: s.region };
+  const metrics = s.metrics || { activeConnections: 0, totalConnections: 0, rxBytes: 0, txBytes: 0, lastActiveAt: s.startedAt };
+  const isAct = s.status === 'active' || s.status === 'running';
+
+  document.getElementById('route-inspector-title').textContent = `Sesión ${s.id}`;
+  const modeBadge = document.getElementById('route-inspector-mode');
+  if (modeBadge) {
+    modeBadge.textContent = isCloud ? '☁️ CLOUD' : '🖥️ LOCAL';
+    modeBadge.className = `badge ${isCloud ? 'text-success' : 'text-muted'}`;
+  }
+  const statusBadge = document.getElementById('route-inspector-status');
+  if (statusBadge) {
+    statusBadge.textContent = s.status.toUpperCase();
+    statusBadge.className = `badge ${isAct ? 'text-success' : 'text-muted'}`;
+  }
+
+  document.getElementById('route-insp-id').textContent = s.id;
+  document.getElementById('route-insp-location').textContent = isCloud ? `${rMeta.flag} ${rMeta.name} (Cloud Runner: ${s.ip || 'Azure Egress'})` : `🖥️ Localhost (${s.bindAddress || '127.0.0.1'})`;
+  document.getElementById('route-insp-times').textContent = `Inicio: ${new Date(s.startedAt).toLocaleTimeString()} | Expira: ${new Date(s.expiresAt).toLocaleTimeString()} (${s.durationMinutes}m)`;
+  document.getElementById('route-insp-traffic').textContent = `RX: ${formatBytes(metrics.rxBytes || 0)} | TX: ${formatBytes(metrics.txBytes || 0)} (Conn: ${metrics.totalConnections || 0})`;
+
+  document.getElementById('route-insp-socks').textContent = s.socks5Url || `socks5h://${s.ip}:${s.socksPort}`;
+  document.getElementById('route-insp-http').textContent = s.httpUrl || `http://${s.ip}:${s.httpPort}`;
+
+  const wlBox = document.getElementById('route-insp-whitelist-box');
+  if (wlBox) {
+    if (s.clientWhitelist && s.clientWhitelist.length > 0) {
+      wlBox.style.display = 'block';
+      document.getElementById('route-insp-whitelist').textContent = s.clientWhitelist.join(', ');
+    } else {
+      wlBox.style.display = 'none';
+    }
+  }
+
+  const edgeBox = document.getElementById('route-insp-edge-box');
+  if (edgeBox) {
+    if (s.edgeWorkloadUrl) {
+      edgeBox.style.display = 'block';
+      document.getElementById('route-insp-edge').textContent = s.edgeWorkloadUrl;
+    } else {
+      edgeBox.style.display = 'none';
+    }
+  }
+
+  const runBox = document.getElementById('route-insp-run-box');
+  if (runBox) {
+    if (s.runUrl) {
+      runBox.style.display = 'block';
+      const link = document.getElementById('route-insp-run');
+      link.href = s.runUrl;
+      link.textContent = `${s.runUrl} ↗`;
+    } else {
+      runBox.style.display = 'none';
+    }
+  }
+
+  document.getElementById('route-insp-curl').value = s.curlCommand || `curl -x ${s.socks5Url} https://api.ipify.org`;
+  document.getElementById('route-insp-export').value = s.envSnippet || `export ALL_PROXY="${s.socks5Url}"`;
+  document.getElementById('route-insp-current-id').value = s.id;
+
+  inspector.style.display = 'block';
+  inspector.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+window.showGatewayDetails = showGatewayDetails;
+
+function closeRouteInspector() {
+  const inspector = document.getElementById('route-session-inspector');
+  if (inspector) inspector.style.display = 'none';
+}
+window.closeRouteInspector = closeRouteInspector;
+
+async function deleteGatewayRecord(id) {
+  if (!confirm(`¿Eliminar permanentemente el registro de la sesión [${id}] del almacenamiento?`)) {
+    return;
+  }
+
+  try {
+    if (state.isLocalServer) {
+      await fetch(`${state.apiBase}/api/route/sessions/${id}`, { method: 'DELETE' });
+    }
+    if (state.ghToken) {
+      try {
+        await vaultClient.deleteFile(`route-sessions/${id}.json`);
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('Error deleting remote route record:', err);
+  }
+
+  state.gateways = state.gateways.filter((g) => g.id !== id);
+  localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+
+  const currId = document.getElementById('route-insp-current-id')?.value;
+  if (currId === id) {
+    closeRouteInspector();
+  }
+
+  renderGateways();
+  refreshStatus();
+}
+window.deleteGatewayRecord = deleteGatewayRecord;
+
+function deleteFromInspector() {
+  const id = document.getElementById('route-insp-current-id')?.value;
+  if (id) deleteGatewayRecord(id);
+}
+window.deleteFromInspector = deleteFromInspector;
+
+async function clearGatewayHistory() {
+  const finishedCount = state.gateways.filter((g) => g.status !== 'active' && g.status !== 'running').length;
+  if (finishedCount === 0) {
+    alert('No hay registros de sesiones finalizadas para borrar.');
+    return;
+  }
+
+  if (!confirm(`¿Deseas eliminar permanentemente los ${finishedCount} registros de sesiones finalizadas/históricas del vault?`)) {
+    return;
+  }
+
+  try {
+    if (state.isLocalServer) {
+      await fetch(`${state.apiBase}/api/route/sessions`, { method: 'DELETE' });
+    }
+  } catch (err) {
+    console.warn('Error clearing remote route records:', err);
+  }
+
+  state.gateways = state.gateways.filter((g) => g.status === 'active' || g.status === 'running');
+  localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
+  closeRouteInspector();
+  renderGateways();
+  refreshStatus();
+  alert(`✔ Historial limpiado: ${finishedCount} registros eliminados.`);
+}
+window.clearGatewayHistory = clearGatewayHistory;
+
 function renderGateways() {
   const active = state.gateways.find((g) => g.status === 'active' || g.status === 'running');
   const quickContainer = document.getElementById('route-quick-connect-container');
@@ -1641,7 +1817,11 @@ function renderGateways() {
   const tbody = document.getElementById('tbody-route-sessions');
   const countBadge = document.getElementById('route-count-badge');
 
-  if (countBadge) countBadge.textContent = `${state.gateways.length} sessions`;
+  const totalCount = state.gateways.length;
+  const activeCount = state.gateways.filter((g) => g.status === 'active' || g.status === 'running').length;
+  const histCount = totalCount - activeCount;
+
+  if (countBadge) countBadge.textContent = `${totalCount} sesiones (${activeCount} activas, ${histCount} pasadas)`;
 
   // Active Quick Connect Card
   if (quickContainer) {
@@ -1653,7 +1833,6 @@ function renderGateways() {
       }
     } else {
       const isCloud = active.mode === 'cloud';
-      const isLocal = !isCloud;
       const isRunning = active.status === 'running';
 
       if (statusPill) {
@@ -1725,31 +1904,44 @@ function renderGateways() {
     }
   }
 
-  // Sessions Table (9 columns)
+  // Filtered Sessions Table (9 columns)
   if (tbody) {
-    if (state.gateways.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No gateway sessions recorded yet.</td></tr>';
+    let displayed = state.gateways;
+    if (state.routeFilter === 'active') {
+      displayed = state.gateways.filter((g) => g.status === 'active' || g.status === 'running');
+    } else if (state.routeFilter === 'history') {
+      displayed = state.gateways.filter((g) => g.status !== 'active' && g.status !== 'running');
+    }
+
+    if (displayed.length === 0) {
+      const msg = state.routeFilter === 'active' ? 'No hay sesiones activas en este momento.' : state.routeFilter === 'history' ? 'No hay sesiones pasadas en el historial.' : 'No hay registros de sesiones.';
+      tbody.innerHTML = `<tr><td colspan="9" class="text-center text-muted">${msg}</td></tr>`;
     } else {
-      tbody.innerHTML = state.gateways
+      tbody.innerHTML = displayed
         .map((s) => {
           const isCloud = s.mode === 'cloud';
           const rMeta = state.regions.find((r) => r.code === s.region) || { flag: '🌐', name: s.region };
           const isAct = s.status === 'active' || s.status === 'running';
           const locStr = isCloud ? `${rMeta.flag} ${rMeta.name}` : `🖥️ ${s.bindAddress || '127.0.0.1'}`;
+          const metrics = s.metrics || { rxBytes: 0, txBytes: 0 };
+          const trafficStr = `${formatBytes(metrics.rxBytes || 0)} / ${formatBytes(metrics.txBytes || 0)}`;
+
           return `
             <tr>
               <td><code>${s.id}</code></td>
               <td><span class="badge ${isCloud ? 'text-success' : 'text-muted'}">${isCloud ? 'CLOUD' : 'LOCAL'}</span></td>
               <td>${locStr}</td>
               <td><span class="badge">${s.protocol.toUpperCase()}</span></td>
-              <td><code>${s.ip}:${s.socksPort}</code></td>
+              <td><code>${s.ip || '127.0.0.1'}:${s.socksPort}</code></td>
               <td>${s.lazarusEnabled ? '<span class="text-success">✔ 24/7 Relay</span>' : '<span class="text-muted">Single</span>'}</td>
-              <td>${new Date(s.expiresAt).toLocaleTimeString()}</td>
+              <td><span style="font-size:0.75rem; color:var(--text-muted);">${trafficStr}</span></td>
               <td><span class="badge ${isAct ? 'text-success' : 'text-muted'}">${s.status.toUpperCase()}</span></td>
               <td>
-                <div style="display:flex; gap:4px;">
-                  ${isAct ? `<button class="btn btn-secondary btn-xs" onclick="testGateway('${s.id}')">🧪 Test</button>` : ''}
-                  ${isAct ? `<button class="btn btn-danger btn-xs" onclick="terminateGateway('${s.id}')">Stop</button>` : '<span class="text-muted">—</span>'}
+                <div style="display:flex; gap:4px; align-items:center;">
+                  <button class="btn btn-secondary btn-xs" title="Ver Detalles y Telemetría" onclick="showGatewayDetails('${s.id}')">👁️</button>
+                  ${isAct ? `<button class="btn btn-secondary btn-xs" title="Probar Conectividad" onclick="testGateway('${s.id}')">🧪</button>` : ''}
+                  ${isAct ? `<button class="btn btn-warning btn-xs" title="Terminar Sesión" onclick="terminateGateway('${s.id}')">🛑</button>` : ''}
+                  <button class="btn btn-danger btn-xs" title="Eliminar Registro" onclick="deleteGatewayRecord('${s.id}')">🗑️</button>
                 </div>
               </td>
             </tr>
@@ -1791,9 +1983,11 @@ async function testGateway(id) {
 window.testGateway = testGateway;
 
 async function terminateGateway(id) {
-  if (state.isLocalServer) {
-    await fetch(`${state.apiBase}/api/route/sessions/${id}`, { method: 'DELETE' });
-  }
+  try {
+    if (state.isLocalServer) {
+      await fetch(`${state.apiBase}/api/route/sessions/${id}/stop`, { method: 'POST' });
+    }
+  } catch {}
   const target = state.gateways.find((g) => g.id === id);
   if (target) target.status = 'terminated';
   localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));

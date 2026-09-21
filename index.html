@@ -1142,24 +1142,85 @@
 
         <!-- Historical and Active Gateways Table -->
         <div class="card mt-4">
-          <div class="card-header">
-            <h3><span class="icon">🛸</span> SilkRoute Session Ledger</h3>
-            <span class="badge" id="route-count-badge">0 sessions</span>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <h3><span class="icon">🛸</span> SilkRoute Session Ledger</h3>
+              <span class="badge" id="route-count-badge">0 sessions</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div class="btn-group" style="display: flex; gap: 4px;">
+                <button type="button" class="btn btn-primary btn-xs" id="btn-route-filter-all" onclick="setRouteFilter('all')">Todos</button>
+                <button type="button" class="btn btn-secondary btn-xs" id="btn-route-filter-active" onclick="setRouteFilter('active')">🟢 Activos</button>
+                <button type="button" class="btn btn-secondary btn-xs" id="btn-route-filter-history" onclick="setRouteFilter('history')">📜 Historial</button>
+              </div>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="loadGateways()">🔄 Refrescar</button>
+              <button type="button" class="btn btn-danger btn-xs" id="btn-clear-route-history" onclick="clearGatewayHistory()">🗑️ Limpiar Historial</button>
+            </div>
           </div>
+
+          <!-- Gateway Session Inspector (shown when clicking 👁️ Ver Detalles) -->
+          <div id="route-session-inspector" class="card-body" style="display: none; border-bottom: 1px solid var(--border-color); background: rgba(128, 60, 255, 0.05); padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="icon" style="font-size: 1.2rem;">🔍</span>
+                <h4 id="route-inspector-title" style="margin: 0; color: #fff; font-size: 1.05rem;">Detalles de Sesión</h4>
+                <span id="route-inspector-mode" class="badge">LOCAL</span>
+                <span id="route-inspector-status" class="badge">ACTIVE</span>
+              </div>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="closeRouteInspector()">✕ Cerrar</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 14px;">
+              <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; display: block;">ID de Sesión</span>
+                <code id="route-insp-id" style="font-size: 0.85rem; color: var(--secondary-aqua);">-</code>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; display: block;">Egress IP &amp; Ubicación</span>
+                <div id="route-insp-location" style="font-size: 0.85rem; color: #fff; font-weight: 600;">-</div>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; display: block;">Horarios (Inicio / Expira)</span>
+                <div id="route-insp-times" style="font-size: 0.82rem; color: var(--text-muted);">-</div>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+                <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; display: block;">Tráfico Registrado (RX / TX)</span>
+                <div id="route-insp-traffic" style="font-size: 0.88rem; color: var(--success); font-weight: 700;">-</div>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; margin-bottom: 12px;">
+              <div><strong style="color: var(--text-muted);">SOCKS5 URI:</strong> <code id="route-insp-socks" class="code-pill">-</code></div>
+              <div><strong style="color: var(--text-muted);">HTTP URI:</strong> <code id="route-insp-http" class="code-pill">-</code></div>
+              <div id="route-insp-whitelist-box" style="display:none;"><strong style="color: var(--text-muted);">ACL Whitelist:</strong> <span id="route-insp-whitelist">-</span></div>
+              <div id="route-insp-edge-box" style="display:none;"><strong style="color: var(--text-muted);">Edge Workload Probe:</strong> <code id="route-insp-edge" class="code-pill">-</code></div>
+              <div id="route-insp-run-box" style="display:none;"><strong style="color: var(--text-muted);">Actions Run:</strong> <a id="route-insp-run" href="#" target="_blank" style="color: var(--secondary-aqua); text-decoration: underline;">Ver Workflow en GitHub Actions ↗</a></div>
+            </div>
+
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-curl" onclick="copySnippetText(document.getElementById('route-insp-curl').value); alert('cURL copiado!')">📋 Copiar cURL</button>
+              <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-export" onclick="copySnippetText(document.getElementById('route-insp-export').value); alert('Export copiado!')">🐚 Copiar Export</button>
+              <button type="button" class="btn btn-danger btn-xs" id="btn-insp-delete" onclick="deleteFromInspector()">🗑️ Borrar este Registro</button>
+              <input type="hidden" id="route-insp-curl" value="" />
+              <input type="hidden" id="route-insp-export" value="" />
+              <input type="hidden" id="route-insp-current-id" value="" />
+            </div>
+          </div>
+
           <div class="card-body">
             <div class="table-wrapper">
               <table class="data-table" id="table-route-sessions">
                 <thead>
                   <tr>
-                    <th>Session ID</th>
-                    <th>Mode</th>
-                    <th>Region / Bind</th>
-                    <th>Protocol</th>
-                    <th>Proxy Endpoint</th>
+                    <th>ID Sesión</th>
+                    <th>Modo</th>
+                    <th>Ubicación / Bind</th>
+                    <th>Protocolo</th>
+                    <th>Endpoint</th>
                     <th>Lazarus 24/7</th>
-                    <th>Expires</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>Tráfico (RX/TX)</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-route-sessions">
