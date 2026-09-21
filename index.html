@@ -1197,9 +1197,10 @@
               <div id="route-insp-run-box" style="display:none;"><strong style="color: var(--text-muted);">Actions Run:</strong> <a id="route-insp-run" href="#" target="_blank" style="color: var(--secondary-aqua); text-decoration: underline;">Ver Workflow en GitHub Actions ↗</a></div>
             </div>
 
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
               <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-curl" onclick="copySnippetText(document.getElementById('route-insp-curl').value); alert('cURL copiado!')">📋 Copiar cURL</button>
               <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-export" onclick="copySnippetText(document.getElementById('route-insp-export').value); alert('Export copiado!')">🐚 Copiar Export</button>
+              <a id="btn-insp-action-link" href="#" target="_blank" class="btn btn-primary btn-xs" style="text-decoration:none; display:none; align-items:center; gap:4px; font-weight:600;">🚀 Ver Acción y Logs en GitHub Actions ↗</a>
               <button type="button" class="btn btn-danger btn-xs" id="btn-insp-delete" onclick="deleteFromInspector()">🗑️ Borrar este Registro</button>
               <input type="hidden" id="route-insp-curl" value="" />
               <input type="hidden" id="route-insp-export" value="" />

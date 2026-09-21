@@ -1719,15 +1719,24 @@ function showGatewayDetails(id) {
   }
 
   const runBox = document.getElementById('route-insp-run-box');
-  if (runBox) {
-    if (s.runUrl) {
+  const actionBtn = document.getElementById('btn-insp-action-link');
+  if (isCloud) {
+    const actionUrl = s.runUrl || (state.ghRepo ? `https://github.com/${state.ghRepo}/actions` : 'https://github.com/amglogicalis/.phryx-storage/actions');
+    if (runBox) {
       runBox.style.display = 'block';
       const link = document.getElementById('route-insp-run');
-      link.href = s.runUrl;
-      link.textContent = `${s.runUrl} ↗`;
-    } else {
-      runBox.style.display = 'none';
+      if (link) {
+        link.href = actionUrl;
+        link.textContent = `${actionUrl} ↗`;
+      }
     }
+    if (actionBtn) {
+      actionBtn.href = actionUrl;
+      actionBtn.style.display = 'inline-flex';
+    }
+  } else {
+    if (runBox) runBox.style.display = 'none';
+    if (actionBtn) actionBtn.style.display = 'none';
   }
 
   document.getElementById('route-insp-curl').value = s.curlCommand || `curl -x ${s.socks5Url} https://api.ipify.org`;
