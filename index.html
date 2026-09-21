@@ -237,7 +237,7 @@
               <code>phryx console</code>
               <span style="font-size: 0.8rem; color: var(--text-muted);">o</span>
               <code id="banner-cmd-example">phryx tunnel --port 3000</code>
-              <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('phryx tunnel --port 3000'); alert('Comando CLI copiado al portapapeles!')">📋 Copiar CLI</button>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('phryx tunnel --port 3000'); showToast('Comando CLI copiado al portapapeles', 'success')">📋 Copiar CLI</button>
             </div>
           </div>
         </div>
@@ -1189,17 +1189,35 @@
               </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; margin-bottom: 12px;">
-              <div><strong style="color: var(--text-muted);">SOCKS5 URI:</strong> <code id="route-insp-socks" class="code-pill">-</code></div>
-              <div><strong style="color: var(--text-muted);">HTTP URI:</strong> <code id="route-insp-http" class="code-pill">-</code></div>
-              <div id="route-insp-whitelist-box" style="display:none;"><strong style="color: var(--text-muted);">ACL Whitelist:</strong> <span id="route-insp-whitelist">-</span></div>
+            <!-- Endpoints Grid -->
+            <div class="gateway-endpoints-grid">
+              <div class="endpoint-block">
+                <div class="endpoint-block-header">
+                  <span>SOCKS5 Proxy Endpoint</span>
+                  <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText(document.getElementById('route-insp-socks').textContent); showToast('SOCKS5 URI copiada al portapapeles', 'success', 'Copiado')">📋 Copiar URI</button>
+                </div>
+                <div class="endpoint-block-val" id="route-insp-socks">-</div>
+              </div>
+
+              <div class="endpoint-block">
+                <div class="endpoint-block-header">
+                  <span>HTTP Proxy Endpoint</span>
+                  <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText(document.getElementById('route-insp-http').textContent); showToast('HTTP URI copiada al portapapeles', 'success', 'Copiado')">📋 Copiar URI</button>
+                </div>
+                <div class="endpoint-block-val" id="route-insp-http">-</div>
+              </div>
+            </div>
+
+            <!-- Optional Metadata Rows -->
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; margin-bottom: 14px;">
+              <div id="route-insp-whitelist-box" style="display:none;"><strong style="color: var(--text-muted);">ACL Whitelist:</strong> <span id="route-insp-whitelist" style="color: var(--secondary-purple);">-</span></div>
               <div id="route-insp-edge-box" style="display:none;"><strong style="color: var(--text-muted);">Edge Workload Probe:</strong> <code id="route-insp-edge" class="code-pill">-</code></div>
-              <div id="route-insp-run-box" style="display:none;"><strong style="color: var(--text-muted);">Actions Run:</strong> <a id="route-insp-run" href="#" target="_blank" style="color: var(--secondary-aqua); text-decoration: underline;">Ver Workflow en GitHub Actions ↗</a></div>
+              <div id="route-insp-run-box" style="display:none;"><strong style="color: var(--text-muted);">Actions Run:</strong> <a id="route-insp-run" href="#" target="_blank" style="color: var(--secondary-aqua); text-decoration: underline; word-break: break-all;">Ver Workflow en GitHub Actions ↗</a></div>
             </div>
 
             <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
-              <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-curl" onclick="copySnippetText(document.getElementById('route-insp-curl').value); alert('cURL copiado!')">📋 Copiar cURL</button>
-              <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-export" onclick="copySnippetText(document.getElementById('route-insp-export').value); alert('Export copiado!')">🐚 Copiar Export</button>
+              <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-curl" onclick="copySnippetText(document.getElementById('route-insp-curl').value); showToast('Comando cURL copiado al portapapeles', 'success')">📋 Copiar cURL</button>
+              <button type="button" class="btn btn-secondary btn-xs" id="btn-insp-copy-export" onclick="copySnippetText(document.getElementById('route-insp-export').value); showToast('Variable de entorno copiada al portapapeles', 'success')">🐚 Copiar Export</button>
               <a id="btn-insp-action-link" href="#" target="_blank" class="btn btn-primary btn-xs" style="text-decoration:none; display:none; align-items:center; gap:4px; font-weight:600;">🚀 Ver Acción y Logs en GitHub Actions ↗</a>
               <button type="button" class="btn btn-danger btn-xs" id="btn-insp-delete" onclick="deleteFromInspector()">🗑️ Borrar este Registro</button>
               <input type="hidden" id="route-insp-curl" value="" />

@@ -29,6 +29,128 @@ const state = {
   ghUser: null,
 };
 
+// ==================== Custom Toast Notification Engine ====================
+function ensureToastContainer() {
+  let container = document.getElementById('phryx-toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'phryx-toast-container';
+    document.body.appendChild(container);
+  }
+  return container;
+}
+
+function showToast(message, type = 'info', title = null, duration = 3500) {
+  const container = ensureToastContainer();
+  const toast = document.createElement('div');
+  toast.className = `phryx-toast toast-${type}`;
+
+  const iconMap = {
+    success: '✔',
+    error: '✖',
+    warning: '⚠️',
+    info: 'ℹ️',
+  };
+
+  const displayTitle = title || (type === 'success' ? 'Éxito' : type === 'error' ? 'Error' : type === 'warning' ? 'Atención' : 'Información');
+
+  toast.innerHTML = `
+    <div class="phryx-toast-icon">${iconMap[type] || 'ℹ️'}</div>
+    <div class="phryx-toast-body">
+      <div class="phryx-toast-title">${displayTitle}</div>
+      <div class="phryx-toast-message">${message}</div>
+    </div>
+    <button type="button" class="phryx-toast-close" onclick="this.parentElement.remove()">✕</button>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.classList.add('toast-hiding');
+    setTimeout(() => toast.remove(), 260);
+  }, duration);
+}
+window.showToast = showToast;
+
+// ==================== Custom Glassmorphic Modal Engine ====================
+function showModal({ title = 'Notificación', message = '', details = null, type = 'info', confirmText = 'Entendido', cancelText = null }) {
+  return new Promise((resolve) => {
+    const existing = document.getElementById('phryx-modal-backdrop');
+    if (existing) existing.remove();
+
+    const backdrop = document.createElement('div');
+    backdrop.id = 'phryx-modal-backdrop';
+
+    const iconMap = {
+      success: '✔',
+      error: '✖',
+      warning: '⚠️',
+      info: '🛸',
+    };
+
+    const confirmBtnClass = type === 'error' || (type === 'warning' && cancelText) ? 'btn-danger' : 'btn-primary';
+
+    backdrop.innerHTML = `
+      <div class="phryx-modal-card">
+        <div class="phryx-modal-header">
+          <div class="phryx-modal-title">
+            <span>${iconMap[type] || '🛸'}</span>
+            <span>${title}</span>
+          </div>
+          <button type="button" class="btn btn-secondary btn-xs" id="btn-phryx-modal-x" style="padding: 2px 7px;">✕</button>
+        </div>
+        <div class="phryx-modal-body">
+          <p>${message}</p>
+          ${details ? `<pre>${details}</pre>` : ''}
+        </div>
+        <div class="phryx-modal-footer">
+          ${cancelText ? `<button type="button" class="btn btn-secondary btn-sm" id="btn-phryx-modal-cancel">${cancelText}</button>` : ''}
+          <button type="button" class="btn ${confirmBtnClass} btn-sm" id="btn-phryx-modal-confirm">${confirmText}</button>
+        </div>
+      </div>
+    `;
+
+    function close(result) {
+      document.removeEventListener('keydown', handleKey);
+      backdrop.remove();
+      resolve(result);
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Escape') close(false);
+      if (e.key === 'Enter' && !cancelText) close(true);
+    }
+
+    document.addEventListener('keydown', handleKey);
+
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) close(false);
+    });
+
+    document.body.appendChild(backdrop);
+
+    document.getElementById('btn-phryx-modal-x')?.addEventListener('click', () => close(false));
+    document.getElementById('btn-phryx-modal-cancel')?.addEventListener('click', () => close(false));
+    document.getElementById('btn-phryx-modal-confirm')?.addEventListener('click', () => close(true));
+  });
+}
+window.showModal = showModal;
+
+function phryxAlert(message, title = 'Notificación', type = 'info') {
+  return showModal({ title, message, type, confirmText: 'Entendido' });
+}
+window.phryxAlert = phryxAlert;
+
+function phryxConfirm(message, title = 'Confirmación requerida') {
+  return showModal({ title, message, type: 'warning', confirmText: 'Confirmar', cancelText: 'Cancelar' });
+}
+window.phryxConfirm = phryxConfirm;
+
+// Override default browser alert
+window.alert = function (msg) {
+  phryxAlert(msg);
+};
+
 // Initialization
 document.addEventListener('DOMContentLoaded', () => {
   initAuth();
@@ -1755,9 +1877,11 @@ function closeRouteInspector() {
 window.closeRouteInspector = closeRouteInspector;
 
 async function deleteGatewayRecord(id) {
-  if (!confirm(`¿Eliminar permanentemente el registro de la sesión [${id}] del almacenamiento?`)) {
-    return;
-  }
+  const confirmed = await phryxConfirm(
+    `¿Eliminar permanentemente el registro de la sesión [${id}] del almacenamiento?`,
+    'Eliminar Registro de Sesión'
+  );
+  if (!confirmed) return;
 
   try {
     if (state.isLocalServer) {
@@ -1782,6 +1906,7 @@ async function deleteGatewayRecord(id) {
 
   renderGateways();
   refreshStatus();
+  showToast(`Registro [${id}] eliminado`, 'success');
 }
 window.deleteGatewayRecord = deleteGatewayRecord;
 
@@ -1794,13 +1919,15 @@ window.deleteFromInspector = deleteFromInspector;
 async function clearGatewayHistory() {
   const finishedCount = state.gateways.filter((g) => g.status !== 'active' && g.status !== 'running').length;
   if (finishedCount === 0) {
-    alert('No hay registros de sesiones finalizadas para borrar.');
+    showToast('No hay registros de sesiones finalizadas para borrar', 'info');
     return;
   }
 
-  if (!confirm(`¿Deseas eliminar permanentemente los ${finishedCount} registros de sesiones finalizadas/históricas del vault?`)) {
-    return;
-  }
+  const confirmed = await phryxConfirm(
+    `¿Deseas eliminar permanentemente los ${finishedCount} registros de sesiones finalizadas/históricas del vault?`,
+    'Limpiar Historial de Gateways'
+  );
+  if (!confirmed) return;
 
   try {
     if (state.isLocalServer) {
@@ -1815,7 +1942,7 @@ async function clearGatewayHistory() {
   closeRouteInspector();
   renderGateways();
   refreshStatus();
-  alert(`✔ Historial limpiado: ${finishedCount} registros eliminados.`);
+  showToast(`Historial limpiado: ${finishedCount} registros eliminados`, 'success');
 }
 window.clearGatewayHistory = clearGatewayHistory;
 
@@ -1875,15 +2002,35 @@ function renderGateways() {
             </div>
           </div>
 
-          <div class="info-row"><span class="label">SOCKS5 URI:</span><code class="code-pill">${active.socks5Url}</code></div>
-          <div class="info-row"><span class="label">HTTP URI:</span><code class="code-pill">${active.httpUrl}</code></div>
-          <div class="info-row"><span class="label">Time Remaining:</span><span class="value text-warning">Expires at ${expiresTime} (${active.durationMinutes}m lease)</span></div>
-          ${active.clientWhitelist && active.clientWhitelist.length > 0 ? `<div class="info-row"><span class="label">ACL Whitelist:</span><span class="value">${active.clientWhitelist.join(', ')}</span></div>` : ''}
-          ${active.edgeWorkloadUrl ? `<div class="info-row"><span class="label">Edge Workload:</span><code class="code-pill">${active.edgeWorkloadUrl}</code></div>` : ''}
-          ${active.runUrl ? `<div class="info-row"><span class="label">Actions Run:</span><a href="${active.runUrl}" target="_blank" style="color:var(--secondary-aqua); text-decoration:underline;">View GitHub Actions Workflow ↗</a></div>` : ''}
+          <!-- Dedicated Proxy Endpoint Blocks (No horizontal overflow) -->
+          <div class="gateway-endpoints-grid">
+            <div class="endpoint-block">
+              <div class="endpoint-block-header">
+                <span>SOCKS5 Proxy Endpoint</span>
+                <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.socks5Url}'); showToast('SOCKS5 URI copiada al portapapeles', 'success')">📋 Copiar</button>
+              </div>
+              <div class="endpoint-block-val">${active.socks5Url}</div>
+            </div>
+
+            <div class="endpoint-block">
+              <div class="endpoint-block-header">
+                <span>HTTP Proxy Endpoint</span>
+                <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.httpUrl}'); showToast('HTTP URI copiada al portapapeles', 'success')">📋 Copiar</button>
+              </div>
+              <div class="endpoint-block-val">${active.httpUrl}</div>
+            </div>
+          </div>
+
+          <!-- Metadata Rows -->
+          <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px; font-size:0.84rem;">
+            <div class="info-row" style="padding:6px 0;"><span class="label">Time Remaining:</span><span class="value text-warning">Expires at ${expiresTime} (${active.durationMinutes}m lease)</span></div>
+            ${active.clientWhitelist && active.clientWhitelist.length > 0 ? `<div class="info-row" style="padding:6px 0;"><span class="label">ACL Whitelist:</span><span class="value" style="color:var(--secondary-purple);">${active.clientWhitelist.join(', ')}</span></div>` : ''}
+            ${active.edgeWorkloadUrl ? `<div class="info-row" style="padding:6px 0;"><span class="label">Edge Workload:</span><code class="code-pill">${active.edgeWorkloadUrl}</code></div>` : ''}
+            ${active.runUrl ? `<div class="info-row" style="padding:6px 0;"><span class="label">Actions Run:</span><a href="${active.runUrl}" target="_blank" style="color:var(--secondary-aqua); text-decoration:underline; word-break:break-all;">Ver Workflow en GitHub Actions ↗</a></div>` : ''}
+          </div>
 
           <!-- Live Telemetry Counters -->
-          <div class="telemetry-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; margin-bottom: 12px; background: rgba(0, 0, 0, 0.25); padding: 10px; border-radius: 6px; border: 1px solid rgba(128, 60, 255, 0.15);">
+          <div class="telemetry-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; margin-bottom: 12px; background: rgba(0, 0, 0, 0.25); padding: 10px; border-radius: 6px; border: 1px solid rgba(128, 60, 255, 0.15);">
             <div style="text-align: center;">
               <span style="display: block; font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Active Conn</span>
               <strong style="font-size: 1.1rem; color: var(--success);" id="metric-active-conn">${metrics.activeConnections || 0}</strong>
@@ -1903,10 +2050,9 @@ function renderGateways() {
           </div>
 
           <div class="gw-actions-row mt-3" style="display:flex; gap:8px; flex-wrap:wrap; margin-top: 10px;">
-            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.socks5Url}'); alert('SOCKS5 URI copiada al portapapeles!')">📋 Copy SOCKS5</button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.httpUrl}'); alert('HTTP URI copiada al portapapeles!')">📋 Copy HTTP</button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.curlCommand}'); alert('cURL command copiado!')">💻 Copy cURL</button>
-            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('export ALL_PROXY=\\'${active.socks5Url}\\''); alert('Export env copiado!')">🐚 Copy Terminal Export</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('${active.curlCommand}'); showToast('Comando cURL copiado al portapapeles', 'success')">💻 Copy cURL</button>
+            <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('export ALL_PROXY=\\'${active.socks5Url}\\''); showToast('Variable de entorno copiada al portapapeles', 'success')">🐚 Copy Terminal Export</button>
+            ${active.runUrl ? `<a href="${active.runUrl}" target="_blank" class="btn btn-primary btn-xs" style="text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600;">🚀 Ver Acción en GitHub Actions ↗</a>` : ''}
           </div>
         </div>
       `;
@@ -1973,15 +2119,37 @@ async function testGateway(id) {
       const res = await fetch(`${state.apiBase}/api/route/test/${id}`, { method: 'POST' });
       const data = await res.json();
       if (data.success) {
-        alert(`✔ Test exitoso:\n${data.message}\nLatencia: ${data.latencyMs}ms | Estado HTTP: ${data.httpStatus || 200}`);
+        await showModal({
+          title: 'Prueba de Conectividad Exitosa',
+          type: 'success',
+          message: data.message || `Proxy respondiendo correctamente a través de ${id}.`,
+          details: `Latencia Egress: ${data.latencyMs}ms\nEstado HTTP: ${data.httpStatus || 200}\nTarget: ${data.target || 'api.ipify.org'}`
+        });
       } else {
-        alert(`✖ Error probando gateway:\n${data.message}`);
+        await showModal({
+          title: 'Fallo de Conectividad',
+          type: 'error',
+          message: data.message || 'No se pudo conectar a través del proxy seleccionado.',
+          details: data.error || 'Verifica que el puerto y túnel sigan abiertos.'
+        });
       }
     } else {
-      alert(`✔ Gateway session [${id}] activa en GitHub Actions.\nConsulta el estado y logs en vivo desde la pestaña de Actions.`);
+      const target = state.gateways.find((g) => g.id === id);
+      const runUrl = target?.runUrl || (state.ghRepo ? `https://github.com/${state.ghRepo}/actions` : 'https://github.com/amglogicalis/.phryx-storage/actions');
+      await showModal({
+        title: 'Sesión Activa en la Nube (Cloud Runner)',
+        type: 'info',
+        message: `La sesión [${id}] se está ejecutando de forma aislada en GitHub Actions a $0 de coste.`,
+        details: `Runner Egress: ${target?.ip || 'Azure IP'}\nUbicación: ${target?.region || 'Global'}\n\nPuedes consultar los logs en vivo y telemetría completa en el workflow:\n${runUrl}`,
+        confirmText: 'Entendido'
+      });
     }
   } catch (err) {
-    alert(`Error de conexión con el test de gateway: ${err.message}`);
+    await showModal({
+      title: 'Error de Conexión',
+      type: 'error',
+      message: `Error al probar la sesión de gateway: ${err.message}`,
+    });
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -3724,21 +3892,39 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
           if (res.ok) {
             const session = await res.json();
             state.gateways.unshift(session);
-            alert(`✔ Gateway local iniciado con éxito en ${bindAddress} (SOCKS: ${socksPort}, HTTP: ${httpPort}).`);
+            showToast(`Gateway local iniciado en ${bindAddress}:${socksPort}`, 'success', 'Gateway Activo');
           } else {
             const errData = await res.json();
-            alert(`Error iniciando gateway local: ${errData.error || res.statusText}`);
+            await showModal({
+              title: 'Error Iniciando Gateway Local',
+              type: 'error',
+              message: errData.error || res.statusText,
+            });
           }
         } catch (err) {
-          alert('Error de conexión con el backend local: ' + err.message);
+          await showModal({
+            title: 'Error de Conexión',
+            type: 'error',
+            message: 'No se pudo conectar con el daemon local de Phryx.',
+            details: err.message
+          });
         }
       } else {
-        alert(`⚠️ Modo Local Daemon seleccionado:\n\nPara arrancar el proxy en tu máquina física (${bindAddress}), inicia la consola desde tu terminal con:\n  phryx console\no ejecuta directamente:\n  phryx route spawn --bind ${bindAddress} --socks-port ${socksPort} --http-port ${httpPort}\n\n💡 Si prefieres desplegar un proxy remoto a $0 de coste en la nube sin software local, activa la pestaña '☁️ Cloud Runner (GitHub Actions)'.`);
+        await showModal({
+          title: 'Modo Local Daemon',
+          type: 'warning',
+          message: `Para arrancar el proxy en tu máquina física (${bindAddress}), inicia la consola desde tu terminal con 'phryx console' o ejecuta directamente por terminal:`,
+          details: `phryx route spawn --bind ${bindAddress} --socks-port ${socksPort} --http-port ${httpPort}\n\n💡 Si prefieres desplegar un proxy remoto a $0 de coste en la nube sin software local, activa la pestaña '☁️ Cloud Runner (GitHub Actions)'.`
+        });
       }
     } else {
       // Cloud Runner Mode (GitHub Actions)
       if (!state.ghToken) {
-        alert('⚠️ Conexión con GitHub requerida:\n\nPor favor, introduce tu GitHub Personal Access Token (PAT) en la barra superior para despachar runners en la nube de GitHub Actions a $0 de coste.');
+        await showModal({
+          title: 'Conexión con GitHub Requerida',
+          type: 'warning',
+          message: 'Introduce tu GitHub Personal Access Token (PAT) en la barra superior para despachar runners en la nube de GitHub Actions a $0 de coste.',
+        });
         if (btn) {
           btn.disabled = false;
           btn.textContent = '☁️ Dispatch Cloud Runner';
@@ -3808,13 +3994,28 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
           localStorage.setItem('phryx_gateways', JSON.stringify(state.gateways));
           vaultClient.setFile(`route-sessions/${session.id}.json`, session, `phryx(route): dispatch cloud session ${session.id}`);
 
-          alert(`✔ Cloud Runner despachado con éxito en ${region.toUpperCase()}!\n\nSe está levantando una máquina virtual efímera en GitHub Actions.\nPuedes seguir la ejecución en directo en:\n${runUrl}`);
+          await showModal({
+            title: 'Cloud Runner Despachado',
+            type: 'success',
+            message: `¡Cloud Runner despachado con éxito en ${region.toUpperCase()}! Se está levantando una máquina virtual efímera en GitHub Actions.`,
+            details: `ID Sesión: ${sessionId}\nUbicación: ${region}\nDuración: ${durationMinutes} min\n\nPuedes seguir la ejecución en directo en:\n${runUrl}`
+          });
         } else {
           const errText = await dispatchRes.text();
-          alert(`Error despachando runner en GitHub Actions (${dispatchRes.status}):\n${errText.slice(0, 150)}`);
+          await showModal({
+            title: 'Error Despachando Runner',
+            type: 'error',
+            message: `GitHub Actions devolvió un error (HTTP ${dispatchRes.status}).`,
+            details: errText.slice(0, 200)
+          });
         }
       } catch (err) {
-        alert('Error conectando con la API de GitHub: ' + err.message);
+        await showModal({
+          title: 'Error de Conexión con GitHub',
+          type: 'error',
+          message: 'Error al contactar con la API de GitHub Actions.',
+          details: err.message
+        });
       }
     }
 
@@ -3851,7 +4052,7 @@ echo "✔ Ready for ephemeral Zero-Trust SSH!"`;
     if (whitelist) cmd += ` --whitelist ${whitelist}`;
 
     copySnippetText(cmd);
-    alert(`Comando CLI copiado al portapapeles:\n${cmd}`);
+    showToast('Comando CLI copiado al portapapeles', 'success');
   });
 }
 
@@ -3870,5 +4071,5 @@ function copySnippet(elementId, isInput = false) {
   if (!el) return;
   const text = (isInput || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') ? el.value : el.textContent;
   navigator.clipboard.writeText(text);
-  alert('Copied to clipboard!');
+  showToast('Copiado al portapapeles', 'success');
 }
