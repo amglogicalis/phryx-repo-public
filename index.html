@@ -382,7 +382,7 @@
         <div class="card mt-4">
           <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <h3><span class="icon">📡</span> Live Request Inspector (Peticiones en Vivo & Replay)</h3>
+              <h3><span class="icon">📡</span> Live Request Inspector (Tráfico en Vivo & Replay)</h3>
             </div>
             <div style="display: flex; gap: 8px; align-items: center;">
               <span class="badge" id="traffic-count-badge">0 peticiones</span>
@@ -399,13 +399,14 @@
                     <th>Ruta</th>
                     <th>Estado</th>
                     <th>Latencia</th>
+                    <th>Tráfico (RX / TX)</th>
                     <th>IP Cliente</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-tunnel-logs">
                   <tr>
-                    <td colspan="7" class="text-center text-muted">A la espera de peticiones en los túneles activos...</td>
+                    <td colspan="8" class="text-center text-muted">A la espera de tráfico en los túneles activos...</td>
                   </tr>
                 </tbody>
               </table>
@@ -1871,6 +1872,6 @@ SSL: 45ms | TTFB: 110ms</code></pre>
     </main>
   </div>
 
-  <script src="app.js?v=20260922.2"></script>
+  <script src="app.js?v=20260922.3"></script>
 </body>
 </html>
