@@ -790,27 +790,32 @@ function renderTunnels() {
     } else {
       sessionContainer.innerHTML = state.tunnels
         .map(
-          (t) => `
+          (t) => {
+            const isActive = t.status === 'active';
+            const badgeClass = isActive ? 'text-success' : 'text-muted';
+            return `
         <div class="session-card">
           <div class="session-header">
             <span class="session-url">${t.publicUrl}</span>
-            <span class="badge ${t.status === 'active' ? '' : 'text-muted'}">${t.status.toUpperCase()}</span>
+            <span class="badge ${badgeClass}">${t.status.toUpperCase()}</span>
           </div>
           <div class="session-meta">
             <span>Forwarding: ${t.localUrl}</span>
-            <span>Total Req: ${t.totalRequests}</span>
-            <span>Latency: ${t.metrics.avgLatencyMs}ms</span>
+            <span>Total Req: ${t.totalRequests || 0}</span>
+            <span>Latency: ${t.metrics?.avgLatencyMs || 0}ms</span>
           </div>
-          <div class="form-actions mt-4">
-            <button class="btn btn-secondary btn-xs" onclick="copySnippetText('${t.publicUrl}')">📋 Copy URL</button>
+          <div class="form-actions mt-4" style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
+            <button class="btn btn-secondary btn-xs" onclick="copySnippetText('${t.publicUrl}'); showToast('URL copiada al portapapeles', 'success')">📋 Copy URL</button>
             ${
-              t.status === 'active'
-                ? `<button class="btn btn-danger btn-xs" onclick="closeTunnel('${t.id}')">🛑 Stop Tunnel</button>`
+              isActive
+                ? `<button class="btn btn-warning btn-xs" onclick="closeTunnel('${t.id}')">🛑 Stop Tunnel</button>`
                 : ''
             }
+            <button class="btn btn-danger btn-xs" title="Eliminar Registro" onclick="deleteTunnelRecord('${t.id}')">🗑️</button>
           </div>
         </div>
-      `
+      `;
+          }
         )
         .join('');
     }
@@ -854,6 +859,31 @@ async function closeTunnel(id) {
   renderTunnels();
   refreshStatus();
 }
+
+async function deleteTunnelRecord(id) {
+  const confirmed = await showModal({
+    title: '¿Eliminar Registro de Túnel?',
+    type: 'warning',
+    message: `¿Estás seguro de que deseas eliminar permanentemente el registro del túnel [${id}]?`,
+    details: 'Esta acción borrará el registro tanto del almacenamiento local como del vault.',
+    confirmText: 'Eliminar Registro',
+    cancelText: 'Cancelar'
+  });
+  if (!confirmed) return;
+
+  if (state.isLocalServer) {
+    try { await fetch(`${state.apiBase}/api/tunnels/${id}`, { method: 'DELETE' }); } catch {}
+  }
+  if (state.ghToken && typeof vaultClient !== 'undefined') {
+    vaultClient.deleteFile(`tunnel-sessions/${id}.json`, `phryx(tunnel): purge session record ${id}`).catch(() => {});
+  }
+
+  state.tunnels = state.tunnels.filter(t => t.id !== id);
+  localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+  renderTunnels();
+  showToast(`Registro [${id}] eliminado correctamente`, 'success');
+}
+window.deleteTunnelRecord = deleteTunnelRecord;
 
 // ==================== CaseShell (SSH CA) Section ====================
 async function loadServers() {
