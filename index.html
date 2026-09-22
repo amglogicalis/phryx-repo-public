@@ -1325,20 +1325,192 @@
         <div class="onboarding-container">
           <!-- Sticky Navigation Pills -->
           <div class="onboarding-pills">
+            <a class="onb-pill" href="#onb-quickstart">📦 Quickstart & npm</a>
+            <a class="onb-pill" href="#onb-tunnel">🌐 PhryxTunnel (2 Motores Reales)</a>
+            <a class="onb-pill" href="#onb-geolarva">🌍 GeoLarva (100% Cloud Real)</a>
             <a class="onb-pill" href="#onb-caseshell">🐚 CaseShell (SSH CA)</a>
-            <a class="onb-pill" href="#onb-tunnel">🌐 PhryxTunnel</a>
             <a class="onb-pill" href="#onb-silkroute">🛸 SilkRoute Proxy</a>
-            <a class="onb-pill" href="#onb-reach">🔗 SilkFilter ACL</a>
-            <a class="onb-pill" href="#onb-geolarva">🌍 GeoLarva Prober</a>
+            <a class="onb-pill" href="#onb-reach">🔗 SilkFilter ACL (5 Fases)</a>
             <a class="onb-pill" href="#onb-practices">💡 Buenas vs Malas Prácticas</a>
             <a class="onb-pill" href="#onb-faq">❓ FAQ & Troubleshooting</a>
           </div>
 
-          <!-- SECTION 1: CASESHELL (SSH CA) -->
+          <!-- SECTION 0: QUICKSTART & NPM -->
+          <div class="card" id="onb-quickstart">
+            <div class="card-header">
+              <h3><span class="icon">📦</span> Paquete Unificado terra-phryx — Instalación & CLI / SDK</h3>
+              <span class="badge" style="background: rgba(128,60,255,0.2); border-color: var(--primary-violet); color: var(--text-primary);">npm oficial</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Distribución Zero-Dependencies en el ecosistema Terra</h3>
+                <p>Phryx se distribuye como un paquete unificado en npm bajo el nombre <strong><code>terra-phryx</code></strong>. No requiere herramientas de compilación externas ni dependencias pesadas en tiempo de ejecución. Solo necesitas <strong>Node.js 18+</strong>.</p>
+              </div>
+
+              <div class="onb-steps-grid-4">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Uso Instantáneo (npx)</h4>
+                  <p>Ejecuta cualquier comando de Phryx al instante sin necesidad de instalar nada en tu sistema.</p>
+                  <pre><code>npx terra-phryx tunnel --port 3000
+npx terra-phryx geo https://api.io
+npx terra-phryx status</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>Instalación Global (CLI)</h4>
+                  <p>Instala el comando <code>phryx</code> globalmente para usarlo en cualquier terminal o script de despliegue.</p>
+                  <pre><code>npm install -g terra-phryx
+phryx tunnel --port 8080 --engine ssh
+phryx console --port 7461</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Como SDK en TypeScript</h4>
+                  <p>Importa la clase <code>Phryx</code> directamente en tu backend de Node.js o microservicios con tipado estricto.</p>
+                  <pre><code>import { Phryx } from 'terra-phryx';
+const phryx = new Phryx();
+const tun = await phryx.startTunnel({
+  port: 3000, engine: 'cloudflared'
+});</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">4</div>
+                  <h4>Consola Web Silk Studio</h4>
+                  <p>Inicia el servidor local de la consola de control visual para gestionar todas las especies en tiempo real.</p>
+                  <pre><code>phryx console --port 7461
+# Abre en tu navegador:
+# http://localhost:7461</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 1: PHRYXTUNNEL -->
+          <div class="card" id="onb-tunnel">
+            <div class="card-header">
+              <h3><span class="icon">🌐</span> PhryxTunnel — Túneles Públicos Reales a $0 (Cloudflare & OpenSSH)</h3>
+              <span class="badge">Especie 1</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Exposición pública instantánea con 2 únicos motores reales y transparentes</h3>
+                <p>Publica cualquier puerto local de tu equipo (ej. <code>localhost:3000</code>) a una URL HTTPS pública accesible globalmente para webhooks de Stripe, GitHub, Shopify o demos directas a clientes. Se han eliminado proxies simulados y herramientas de terceros con falsos positivos; <strong>Phryx opera exclusivamente con 2 motores reales probados en producción</strong>.</p>
+              </div>
+
+              <!-- DUAL ENGINE GRID -->
+              <h4 style="margin-top: 18px; margin-bottom: 8px; color: var(--secondary-aqua); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>⚡</span> Motores de Ingress Disponibles (Sin Falsos Positivos ni Coste)
+              </h4>
+              <div class="onb-steps-grid-2">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>☁️ Cloudflare Quick Tunnel (*.trycloudflare.com)</h4>
+                  <p>Aprovecha la red de borde global de Cloudflare. Resuelve vía DNS-over-HTTPS (DoH) integrado en Phryx para eludir bloqueos locales de operadoras. Cero configuración, cifrado TLS automático y ultra-baja latencia.</p>
+                  <pre><code>phryx tunnel --port 3000 \
+  --engine cloudflared \
+  --timeout 60</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>🔒 OpenSSH Nativo - Pinggy / Relay (*.lhr.life)</h4>
+                  <p>Utiliza el ejecutable nativo <code>ssh.exe</code> firmado por Microsoft (OpenSSH para Windows) o el cliente nativo de Linux hacia <code>localhost.run</code>. <strong>100% limpio en antivirus y firewalls corporativos</strong>, sin binarios desconocidos.</p>
+                  <pre><code>phryx tunnel --port 3000 \
+  --engine ssh \
+  --timeout 60</code></pre>
+                </div>
+              </div>
+
+              <!-- ADVANCED TUNNEL CAPABILITIES -->
+              <h4 style="margin-top: 24px; margin-bottom: 8px; color: var(--secondary-purple); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
+                <span>🛠️</span> Capacidades de Diagnóstico, Inspector y Replay
+              </h4>
+              <div class="onb-steps-grid-3">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">A</div>
+                  <h4>Inspector de Tráfico en Vivo</h4>
+                  <p>Intercepta automáticamente peticiones entrantes grabando método HTTP, ruta, cabeceras, código de estado, bytes transferidos (RX/TX) y latencia en milisegundos.</p>
+                  <pre><code>POST /api/webhook 200 OK
+Latency: 3ms | TX: 3887B</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">B</div>
+                  <h4>1-Click Traffic Replay</h4>
+                  <p>Permite reejecutar cualquier petición grabada hacia tu servidor local mediante el endpoint <code>/api/tunnels/:id/replay/:logId</code> para depurar webhooks sin recrear eventos.</p>
+                  <pre><code>phryx tunnel replay &lt;id&gt; &lt;logId&gt;
+Status: 200 OK (2ms)</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">C</div>
+                  <h4>Higiene & Purga de Inactivos</h4>
+                  <p>Al llegar el timeout configurado o cerrar el túnel, puedes purgar de un solo clic todas las sesiones cerradas mediante el botón <strong>"Purgar Inactivos"</strong> o <code>POST /api/tunnels/purge</code>.</p>
+                  <pre><code>POST /api/tunnels/purge
+✔ Se purgaron N sesiones</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 2: GEOLARVA -->
+          <div class="card" id="onb-geolarva">
+            <div class="card-header">
+              <h3><span class="icon">🌍</span> GeoLarva — Multi-Region Edge Prober (100% Cloud CI/CD)</h3>
+              <span class="badge">Especie 2</span>
+            </div>
+            <div class="card-body">
+              <div class="onb-section-header">
+                <h3>Sondeo de latencia y disponibilidad global mediante runners reales de GitHub Actions</h3>
+                <p>GeoLarva ejecuta pruebas de rendimiento y disponibilidad en <strong>6 continentes simultáneamente</strong>. Se eliminaron por completo las simulaciones matemáticas locales: cada sondeo se despacha a través de <strong>máquinas virtuales reales en la nube de Azure/GitHub</strong> (a $0 de infraestructura).</p>
+              </div>
+
+              <div class="onb-steps-grid-4">
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">1</div>
+                  <h4>Disparo Automático a la Nube</h4>
+                  <p>Tanto en la CLI como en la consola web, el comando activa el workflow <code>geolarva-probe.yml</code> mediante <code>workflow_dispatch</code> en el repositorio del Vault.</p>
+                  <pre><code>phryx geo https://tu-app.com
+# Despacha runners paralelos</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">2</div>
+                  <h4>6 Centros de Datos Físicos</h4>
+                  <p>Runners independientes realizan el sondeo desde US East, West Europe, Tokyo, São Paulo, Sydney y Johannesburgo registrando su IP pública real.</p>
+                  <pre><code>🇦🇺 Sydney:  20.186.238.89
+🇿🇦 Jo'burg: 4.236.151.9
+🇯🇵 Tokyo:   128.24.163.99</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">3</div>
+                  <h4>Telemetría de Red de 5 Fases</h4>
+                  <p>Cada runner mide con precisión microsegundo: resolución DNS, conexión TCP, TLS Handshake, Time to First Byte (TTFB) y latencia total de descarga.</p>
+                  <pre><code>DNS: 2ms | Connect: 9ms
+TTFB: 57ms | Latency: 76ms</code></pre>
+                </div>
+
+                <div class="onb-step-card">
+                  <div class="onb-step-badge">4</div>
+                  <h4>Streaming & Vault Sync</h4>
+                  <p>Los reportes se sincronizan en tiempo real en <code>geo/runs/</code> en el Vault y se genera la matriz de resumen indicando la región más rápida y disponibilidad SLA.</p>
+                  <pre><code>Fastest: east-us (49ms)
+Global SLA: 100% OK (113ms)</code></pre>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3: CASESHELL (SSH CA) -->
           <div class="card" id="onb-caseshell">
             <div class="card-header">
               <h3><span class="icon">🐚</span> CaseShell — Zero-Trust Ephemeral SSH</h3>
-              <span class="badge">Especie 1</span>
+              <span class="badge">Especie 3</span>
             </div>
             <div class="card-body">
               <div class="onb-section-header">
@@ -1400,52 +1572,11 @@ Zero orphan keys.</code></pre>
             </div>
           </div>
 
-          <!-- SECTION 2: PHRYXTUNNEL -->
-          <div class="card" id="onb-tunnel">
-            <div class="card-header">
-              <h3><span class="icon">🌐</span> PhryxTunnel — Localhost to Public Internet ($0)</h3>
-              <span class="badge">Especie 2</span>
-            </div>
-            <div class="card-body">
-              <div class="onb-section-header">
-                <h3>Túneles inversos efímeros para webhooks y testing local</h3>
-                <p>Publica cualquier puerto local de tu equipo (ej. <code>localhost:3000</code>) a una URL HTTPS pública accesible globalmente para probar webhooks de Stripe, GitHub, Shopify o demos directas a clientes, sin pagar suscripciones mensuales de ngrok ni ngrok limits.</p>
-              </div>
-
-              <div class="onb-steps-grid-3">
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">1</div>
-                  <h4>Exclusivo de Entorno Local</h4>
-                  <p>Los navegadores en GitHub Pages no pueden interceptar ni escuchar los puertos físicos de tu máquina. Por ello, el túnel se arranca desde tu terminal o consola local.</p>
-                  <pre><code>phryx tunnel --port 3000 \
-  --timeout 30 \
-  --auth mi-secreto</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">2</div>
-                  <h4>Autenticación Obligatoria</h4>
-                  <p>Protege tu endpoint con un token de autorización. Cualquier petición entrante deberá suministrar el header <code>X-Phryx-Token: &lt;token&gt;</code> para alcanzar tu servidor.</p>
-                  <pre><code>curl -H "X-Phryx-Token: token" \
-  https://tunnel.phryx.terra/x</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">3</div>
-                  <h4>Auto-Cierre & Inspector</h4>
-                  <p>Al llegar el timeout configurado (ej. 30 minutos), el túnel se disuelve automáticamente. La consola web inspecciona en tiempo real latencia, bytes y códigos de estado.</p>
-                  <pre><code>200 OK | POST /webhook/stripe
-Latency: 14ms | Bytes: 412B</code></pre>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 3: SILKROUTE PROXY -->
+          <!-- SECTION 4: SILKROUTE PROXY -->
           <div class="card" id="onb-silkroute">
             <div class="card-header">
               <h3><span class="icon">🛸</span> SilkRoute — Ephemeral Cloud Proxy Gateway</h3>
-              <span class="badge">Especie 3</span>
+              <span class="badge">Especie 4</span>
             </div>
             <div class="card-body">
               <div class="onb-section-header">
@@ -1521,11 +1652,11 @@ Latency: 12ms (HTTP 200)</code></pre>
             </div>
           </div>
 
-          <!-- SECTION 4: SILKFILTER ACL -->
+          <!-- SECTION 5: SILKFILTER ACL -->
           <div class="card" id="onb-reach">
             <div class="card-header">
               <h3><span class="icon">🔗</span> PhryxReach & SilkFilter — Dynamic Cloud ACLs</h3>
-              <span class="badge">Especie 4</span>
+              <span class="badge">Especie 5</span>
             </div>
             <div class="card-body">
               <div class="onb-section-header">
@@ -1550,8 +1681,8 @@ Latency: 12ms (HTTP 200)</code></pre>
                   <div class="onb-step-badge">B</div>
                   <h4>Vía B — Zero-Cost Socket Perimeter Target</h4>
                   <p>Objetivo perimetral de zero-trust sin coste ni credenciales cloud (<code>127.0.0.1:47890</code> o túnel efímero). Valida el ciclo completo de 5 fases, handshakes y purga a $0 de coste.</p>
-                  <pre><code>phryx reach add --provider silkfilter-guard \
-  --resource 127.0.0.1:47890 --port 47890</code></pre>
+                  <pre><code>phryx reach run --mode sandbox \
+  --provider aws-sg --resource sg-0abc123</code></pre>
                 </div>
               </div>
 
@@ -1564,8 +1695,8 @@ Latency: 12ms (HTTP 200)</code></pre>
                   <div class="onb-step-badge">1</div>
                   <h4>Pre-check Cerrado</h4>
                   <p>Verifica que el puerto perimetral esté estrictamente cerrado antes de autorizar.</p>
-                  <pre><code>[Pre-Check] 47890: CLOSED
-Refused: perimeter sealed</code></pre>
+                  <pre><code>[Pre-Check] CLOSED
+Perimeter sealed (5ms)</code></pre>
                 </div>
 
                 <div class="onb-step-card">
@@ -1573,7 +1704,7 @@ Refused: perimeter sealed</code></pre>
                   <h4>JIT Ingress Injection</h4>
                   <p>Detecta la IP dinámica del runner e inyecta la regla temporal con TTL.</p>
                   <pre><code>RUNNER_IP=$(curl -s ifconfig.me)
-Injecting IP: ${RUNNER_IP}/32</code></pre>
+Injected: ${RUNNER_IP}/32</code></pre>
                 </div>
 
                 <div class="onb-step-card">
@@ -1581,7 +1712,7 @@ Injecting IP: ${RUNNER_IP}/32</code></pre>
                   <h4>Workload Handshake</h4>
                   <p>Ejecuta las pruebas o migraciones con conectividad e integridad verificadas.</p>
                   <pre><code>[Workload] 200 OK
-Handshake verified (12ms)</code></pre>
+Handshake verified (3ms)</code></pre>
                 </div>
 
                 <div class="onb-step-card">
@@ -1597,90 +1728,8 @@ Handshake verified (12ms)</code></pre>
                   <div class="onb-step-badge">5</div>
                   <h4>Post-check 0 Residuo</h4>
                   <p>Sondeo final que certifica que el puerto vuelve a quedar herméticamente cerrado.</p>
-                  <pre><code>[Post-Check] 0 ports open
-Perimeter secure (CLOSED)</code></pre>
-                </div>
-              </div>
-
-              <!-- AUDIT TRAIL & INSPECTOR -->
-              <h4 style="margin-top: 24px; margin-bottom: 8px; color: var(--secondary-aqua); font-size: 0.92rem; display: flex; align-items: center; gap: 6px;">
-                <span>📜</span> SilkFilter Audit Trail & Inspector
-              </h4>
-              <div class="onb-steps-grid-3">
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">1</div>
-                  <h4>Registro Auditable Inmutable</h4>
-                  <p>Cada inyección, auto-purga, timestamp y código de estado queda registrado en almacenamiento local y sincronizado en <code>.phryx-storage</code>.</p>
-                  <pre><code>Audit Trail:
-Saved to .phryx-storage/reach/
-Hash: e3b0c44... (SHA-256)</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">2</div>
-                  <h4>Inspector Modal & Re-Run</h4>
-                  <p>Haz clic en "Review" en cualquier registro del historial para inspeccionar payloads, latencias y logs. Re-audita o re-ejecuta con 1 solo clic.</p>
-                  <pre><code>Actions:
-[Review Modal] [1-Click Re-Run]
-[Dispatch to CI/CD]</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">3</div>
-                  <h4>Higiene y Borrado Seguro</h4>
-                  <p>Permite eliminar registros individuales obsoletos o purgar el historial según tus políticas de cumplimiento normativo (GDPR / SOC2).</p>
-                  <pre><code>Delete Record:
-Purged from audit index.
-Zero orphan traces.</code></pre>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SECTION 5: GEOLARVA -->
-          <div class="card" id="onb-geolarva">
-            <div class="card-header">
-              <h3><span class="icon">🌍</span> GeoLarva — Multi-Region Edge Prober</h3>
-              <span class="badge">Especie 5</span>
-            </div>
-            <div class="card-body">
-              <div class="onb-section-header">
-                <h3>Sondeo de latencia, TLS y disponibilidad global desde 6 continentes</h3>
-                <p>Ejecuta sondas sintéticas en paralelo desde runners y edges distribuidos en todo el planeta para auditar CDN, DNS y TTFB sin pagar suscripciones a Pingdom, DataDog o New Relic.</p>
-              </div>
-
-              <div class="onb-steps-grid-4">
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">1</div>
-                  <h4>Matriz de 6 Continentes</h4>
-                  <p>Sondeo simultáneo desde US East (Virginia), Europe West (Fráncfort), Asia Pacific (Tokio), South America (São Paulo), Australia (Sídney) y Africa (Johannesburgo).</p>
-                  <pre><code>phryx geo https://api.io \
-  --regions all --matrix</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">2</div>
-                  <h4>Desglose Métrico de 4 Fases</h4>
-                  <p>Medición granular de cada etapa de red: resolución DNS, negociación TCP, handshake TLS/SSL y tiempo hasta el primer byte (TTFB).</p>
-                  <pre><code>DNS: 12ms | TCP: 28ms
-SSL: 45ms | TTFB: 110ms</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">3</div>
-                  <h4>Alertas de Umbral & SLA</h4>
-                  <p>Detección visual automática cuando una región geográfica supera los umbrales de SLA (>500ms degradado, >1000ms crítico/timeout).</p>
-                  <pre><code>SLA Status:
-[PASS] 5/6 regions
-[WARN] SAO: 520ms (&gt;500ms)</code></pre>
-                </div>
-
-                <div class="onb-step-card">
-                  <div class="onb-step-badge">4</div>
-                  <h4>Probe History & Re-Auditoría</h4>
-                  <p>Historial persistente de todas las sondas. Pulsa "Review" para inspeccionar métricas pasadas o "Re-Probar" para relanzar al instante.</p>
-                  <pre><code>History actions:
-[Review] [Re-Probe] [Delete]</code></pre>
+                  <pre><code>[Post-Check] 0 open ports
+Perimeter secure (1ms)</code></pre>
                 </div>
               </div>
             </div>
@@ -1703,6 +1752,10 @@ SSL: 45ms | TTFB: 110ms</code></pre>
                   <ul class="practice-list">
                     <li>
                       <span class="bullet">✔</span>
+                      <div><strong>Elegir el motor de túnel adecuado:</strong> Usa <code>cloudflared</code> para máxima velocidad y CDN global; usa <code>ssh</code> para entornos donde antivirus o políticas corporativas restrinjan binarios no firmados.</div>
+                    </li>
+                    <li>
+                      <span class="bullet">✔</span>
                       <div><strong>Duración SSH mínima estricta:</strong> Solicita certificados de 15 a 30 minutos para tareas de mantenimiento puntual. Cuanto más corta la validez, menor la ventana de riesgo.</div>
                     </li>
                     <li>
@@ -1715,11 +1768,11 @@ SSL: 45ms | TTFB: 110ms</code></pre>
                     </li>
                     <li>
                       <span class="bullet">✔</span>
-                      <div><strong>Proteger Túneles con Token de Autenticación:</strong> Configura siempre un <code>--auth</code> en tus túneles locales para impedir escaneos no autorizados.</div>
+                      <div><strong>Proteger Túneles con Token de Autenticación:</strong> Configura siempre un <code>--auth</code> en tus túneles locales para impedir escaneos no autorizados en internet.</div>
                     </li>
                     <li>
                       <span class="bullet">✔</span>
-                      <div><strong>Usa Vía B para testing y CI local:</strong> Utiliza el Socket Perimeter Guard (<code>127.0.0.1:47890</code>) para pruebas sin coste y sin exponer credenciales cloud.</div>
+                      <div><strong>Usa Vía B para testing y CI local:</strong> Utiliza el modo Sandbox para pruebas sin coste y sin exponer credenciales cloud en entornos de desarrollo.</div>
                     </li>
                     <li>
                       <span class="bullet">✔</span>
@@ -1727,11 +1780,7 @@ SSL: 45ms | TTFB: 110ms</code></pre>
                     </li>
                     <li>
                       <span class="bullet">✔</span>
-                      <div><strong>Verificar 0 Puertos Residuales:</strong> Comprueba siempre la Fase 5 del SilkFilter para asegurar que el perímetro queda sellado tras el pipeline.</div>
-                    </li>
-                    <li>
-                      <span class="bullet">✔</span>
-                      <div><strong>Lazarus Relay para tareas largas:</strong> Utiliza el modo Lazarus si requieres proxies SOCKS5 durante más de 6 horas para evitar caídas imprevistas.</div>
+                      <div><strong>Purgar sesiones periódicamente:</strong> Utiliza el botón "Purgar Inactivos" en la consola para mantener el historial del Vault libre de sesiones muertas.</div>
                     </li>
                   </ul>
                 </div>
@@ -1773,7 +1822,7 @@ SSL: 45ms | TTFB: 110ms</code></pre>
                     </li>
                     <li>
                       <span class="bullet">✖</span>
-                      <div><strong>Ignorar las alertas de SLA geográfico:</strong> No desestimes degradaciones continuadas (>500ms) en continentes clave reportadas por GeoLarva.</div>
+                      <div><strong>Confiar en latencias locales simuladas:</strong> En GeoLarva, ejecuta siempre el sondeo Cloud real para auditar cómo responde tu app desde nodos de otros continentes.</div>
                     </li>
                   </ul>
                 </div>
@@ -1792,77 +1841,60 @@ SSL: 45ms | TTFB: 110ms</code></pre>
                 <details class="faq-item">
                   <summary class="faq-summary">¿Tiene algún coste de infraestructura o requiere servidores dedicados?</summary>
                   <div class="faq-content">
-                    <strong>Rotundamente no ($0 de coste).</strong> Todo el ecosistema Phryx aprovecha la computación efímera de GitHub Actions runners, criptografía local OpenSSH y la API de GitHub. No requiere clústeres de HashiCorp Vault, ni servidores Teleport de pago, ni agentes de fondo residentes.
+                    <strong>Rotundamente no ($0 de coste).</strong> Todo el ecosistema Phryx aprovecha la computación efímera de GitHub Actions runners, criptografía local OpenSSH, los relays públicos sin coste de Cloudflare/localhost.run y la API de GitHub. No requiere clústeres de HashiCorp Vault, servidores Teleport ni agentes residentes de pago.
                   </div>
                 </details>
 
                 <details class="faq-item">
-                  <summary class="faq-summary">¿Qué diferencia hay entre Vía A y Vía B en SilkFilter?</summary>
+                  <summary class="faq-summary">¿Cuáles son los motores de túnel soportados y cuál debo elegir?</summary>
                   <div class="faq-content">
-                    <strong>Vía A</strong> interactúa con las APIs nativas de proveedores cloud (AWS Security Groups o Cloudflare WAF) y requiere API tokens para abrir y cerrar el firewall de producción. <strong>Vía B</strong> es un objetivo perimetral zero-trust sin coste (<code>127.0.0.1:47890</code> o túnel efímero) diseñado para validar el flujo completo de 5 fases, handshakes de red y auto-purga sin gastar dinero ni requerir credenciales externas.
+                    Phryx soporta estrictamente 2 motores públicos reales:
+                    <ul>
+                      <li><strong><code>cloudflared</code></strong>: Crea URLs <code>*.trycloudflare.com</code> a través del edge global de Cloudflare con DoH (DNS-over-HTTPS) integrado. Es la opción recomendada para desarrollo web y webhooks de alta concurrencia.</li>
+                      <li><strong><code>ssh</code> (OpenSSH Nativo)</strong>: Crea URLs <code>*.lhr.life</code> / <code>*.pinggy.link</code> mediante el cliente nativo OpenSSH (<code>ssh.exe</code>). Ideal si estás en redes corporativas con antivirus que bloquean binarios externos.</li>
+                    </ul>
                   </div>
                 </details>
 
                 <details class="faq-item">
-                  <summary class="faq-summary">¿Por qué aparece "Simulated target: 127.0.0.1:47890 (SilkFilter Zero-Trust Guard)" en la consola?</summary>
+                  <summary class="faq-summary">¿Por qué GeoLarva tarda unos 20-30 segundos en completar?</summary>
                   <div class="faq-content">
-                    Es el target predeterminado de Vía B. Permite probar el ciclo de vida de inyección efímera JIT, comprobación de puerto cerrado, verificación de handshake y purga automática sin necesidad de configurar una cuenta de AWS o Cloudflare. Cuando configures tus credenciales de nube en Configuración, podrás alternar libremente a Vía A.
+                    Porque <strong>no realiza ninguna simulación matemática local</strong>. Al ejecutar <code>phryx geo &lt;url&gt;</code>, despacha 6 runners físicos independientes en la infraestructura en la nube de GitHub Actions distribuidos en América del Norte, Europa, Asia, Sudamérica, Oceanía y África. Cada runner arranca, realiza peticiones HTTP reales registrando su IP pública de Azure y sincroniza su telemetría en el Vault.
                   </div>
                 </details>
 
                 <details class="faq-item">
-                  <summary class="faq-summary">¿Cómo se garantiza que ningún puerto quede abierto si el runner de CI/CD se cancela o explota?</summary>
+                  <summary class="faq-summary">¿Cómo instalo y ejecuto Phryx con npm o npx?</summary>
                   <div class="faq-content">
-                    Mediante la directiva obligatoria <code>if: always()</code> en GitHub Actions. Incluso si el paso de pruebas unitarias o de integración finaliza con error de código o timeout, el runner ejecuta forzosamente el paso de purga. Además, la Fase 5 efectúa un sondeo activo (post-check) que certifica cero puertos residuales abiertos.
+                    Puedes ejecutarlo instantáneamente sin instalar nada ejecutando <code>npx terra-phryx tunnel --port 3000</code>, o instalarlo como comando global permanente con <code>npm install -g terra-phryx</code>. Para proyectos de Node.js o TypeScript, impórtalo como SDK con <code>import { Phryx } from 'terra-phryx'</code>.
                   </div>
                 </details>
 
                 <details class="faq-item">
-                  <summary class="faq-summary">¿Cómo funciona el botón "Review" en el Audit Trail y en GeoLarva?</summary>
+                  <summary class="faq-summary">¿Por qué PhryxTunnel no se puede iniciar directamente desde la consola en GitHub Pages?</summary>
                   <div class="faq-content">
-                    El botón <strong>Review</strong> abre un modal interactivo con el registro íntegro almacenado en <code>.phryx-storage</code> o en local. En SilkFilter te muestra los payloads, hashes SHA-256 y marcas temporales de inyección/purga. En GeoLarva te desglosa los tiempos de DNS, TCP, SSL y TTFB de los 6 continentes. Desde dicho modal puedes relanzar la prueba ("Re-Run" / "Re-Probe") o borrar el registro.
+                    Por restricciones de seguridad fundamentales del navegador. Un navegador web corriendo en <code>https://amglogicalis.github.io</code> no puede escuchar ni reenviar los sockets físicos del ordenador del usuario. Por ello, la consola online te proporciona el comando CLI exacto para copiarlo o te permite despachar un Cloud Runner en GitHub Actions.
                   </div>
                 </details>
 
                 <details class="faq-item">
                   <summary class="faq-summary">¿Qué sucede con mi sesión SSH activa cuando el certificado expira?</summary>
                   <div class="faq-content">
-                    OpenSSH valida la fecha y hora de expiración en el momento del <strong>handshake inicial</strong> de conexión. Si la conexión ya está abierta y el certificado expira a los 30 minutos, la sesión establecida permanecerá activa mientras no te desconectes. Sin embargo, no será posible abrir <strong>ninguna nueva conexión</strong> ni re-autenticarse con ese certificado una vez superada la hora de caducidad.
-                  </div>
-                </details>
-
-                <details class="faq-item">
-                  <summary class="faq-summary">¿Por qué PhryxTunnel no se puede iniciar directamente desde GitHub Pages?</summary>
-                  <div class="faq-content">
-                    Por motivos de seguridad del modelo de Sandbox de los navegadores web. Un navegador en <code>https://amglogicalis.github.io</code> no tiene privilegios para interceptar puertos locales (como <code>localhost:3000</code>) en tu ordenador físico. Por ello, PhryxTunnel se ejecuta desde tu terminal con <code>phryx tunnel --port 3000</code> o arrancando la consola local con <code>phryx console</code>.
+                    OpenSSH valida la expiración en el momento del <strong>handshake inicial</strong>. Si la sesión ya está establecida cuando el certificado caduca, la conexión seguirá abierta hasta que te desconectes. Sin embargo, no será posible abrir ninguna nueva terminal ni reconectar con ese certificado una vez superado el tiempo de validez.
                   </div>
                 </details>
 
                 <details class="faq-item">
                   <summary class="faq-summary">¿Cómo garantiza SilkRoute persistencia 24/7 si GitHub limita los runners a 6 horas?</summary>
                   <div class="faq-content">
-                    Mediante el motor <strong>Lazarus Relay</strong>. El runner calcula la hora límite de expiración (5 horas y 50 minutos) y, antes de finalizar, efectúa una llamada a la API de GitHub Actions (<code>workflow_dispatch</code>) despachando un nuevo runner sucesor. La sesión y credenciales se transfieren en milisegundos, manteniendo el proxy disponible de forma ininterrumpida.
-                  </div>
-                </details>
-
-                <details class="faq-item">
-                  <summary class="faq-summary">¿Puedo usar mi propia clave pública SSH sin generar archivos temporales en disco?</summary>
-                  <div class="faq-content">
-                    <strong>Sí.</strong> En el formulario de emisión de CaseShell o en la CLI con el flag <code>--pub ~/.ssh/id_ed25519.pub</code>, puedes suministrar tu clave pública existente. La CA de Phryx firmará tu clave personal y no se escribirá ninguna clave privada en disco, conectándote directamente con tu par habitual.
+                    Mediante el motor <strong>Lazarus Relay</strong>. A las 5 horas y 50 minutos de ejecución, el runner despacha automáticamente a su sucesor vía <code>workflow_dispatch</code> antes de terminar, transfiriendo la sesión y manteniendo el proxy activo de forma continua e ininterrumpida.
                   </div>
                 </details>
 
                 <details class="faq-item">
                   <summary class="faq-summary">¿Dónde se guardan los datos y el historial de sesiones?</summary>
                   <div class="faq-content">
-                    En tu propio repositorio privado <code>.phryx-storage</code> de GitHub a través del PAT autenticado, y en almacenamiento local en <code>.phryx_storage/</code>. No existen bases de datos de terceros ni telemetría externa.
-                  </div>
-                </details>
-
-                <details class="faq-item">
-                  <summary class="faq-summary">¿Qué versiones de OpenSSH son compatibles con CaseShell?</summary>
-                  <div class="faq-content">
-                    Cualquier versión de OpenSSH 5.4 o superior (lanzada en 2010). El soporte para <code>TrustedUserCAKeys</code> y certificados Ed25519 es nativo en todas las distribuciones modernas de Linux (Ubuntu, Debian, RedHat, Amazon Linux, Alpine, CentOS, etc.) sin necesidad de instalar agentes ni software adicional.
+                    En tu repositorio privado <code>amglogicalis/.phryx-storage</code> en GitHub mediante tu Personal Access Token (PAT), y en el directorio local <code>.phryx_storage/</code>. No se envían datos a servidores de terceros ni existe telemetría propietaria oculta.
                   </div>
                 </details>
               </div>
@@ -1873,6 +1905,6 @@ SSL: 45ms | TTFB: 110ms</code></pre>
     </main>
   </div>
 
-  <script src="app.js?v=20260922.6"></script>
+  <script src="app.js?v=20260922.7"></script>
 </body>
 </html>
