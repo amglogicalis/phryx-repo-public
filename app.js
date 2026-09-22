@@ -886,6 +886,18 @@ function renderTunnels() {
             const engineTag = `<span class="session-engine-tag">${(t.engine || 'CLOUDFLARE').toUpperCase()}</span>`;
             const isHttp = t.publicUrl && t.publicUrl.startsWith('http');
 
+            const dnsNotice = t.e2eHealth?.dnsWarning
+              ? `<div style="margin-top: 8px; font-size: 0.8rem; background: rgba(255,170,0,0.12); border-left: 3px solid #ffaa00; padding: 6px 10px; border-radius: 4px; color: #ffca40;">
+                  ⚠️ <strong>Aviso DNS:</strong> ${t.e2eHealth.dnsWarning}
+                  <a href="javascript:void(0)" onclick="showDnsTroubleshootModal()" style="color: #60a5fa; text-decoration: underline; margin-left: 6px;">¿Cómo solucionarlo?</a>
+                </div>`
+              : (t.engine === 'cloudflared' && isActive
+                ? `<div style="margin-top: 6px; font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 6px;">
+                    <span>💡 ¿Te da error <code>DNS_PROBE_FINISHED_NXDOMAIN</code>?</span>
+                    <a href="javascript:void(0)" onclick="showDnsTroubleshootModal()" style="color: #a78bfa; text-decoration: underline; cursor: pointer;">Ver solución en 1 clic</a>
+                  </div>`
+                : '');
+
             return `
         <div class="session-card" id="card-${t.id}">
           <div class="session-header">
@@ -904,6 +916,7 @@ function renderTunnels() {
             <span><strong>Latencia Media:</strong> ${t.metrics?.avgLatencyMs || 0}ms</span>
             <span><strong>Expira:</strong> ${new Date(t.expiresAt).toLocaleTimeString()}</span>
           </div>
+          ${dnsNotice}
           <div class="form-actions mt-4" style="display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
             <button class="btn btn-secondary btn-xs" onclick="copySnippetText('${t.publicUrl}'); showToast('URL pública copiada al portapapeles', 'success')">📋 Copiar URL</button>
             <button class="btn btn-secondary btn-xs" onclick="testTunnelProbe('${t.id}')">⚡ Probar Conectividad E2E</button>
@@ -948,9 +961,9 @@ function renderTunnels() {
           <td><span class="${scColor}" style="font-weight: 600;">${l.statusCode}</span></td>
           <td>${l.durationMs}ms</td>
           <td>${formatBytes(l.bytesReceived)} / ${formatBytes(l.bytesSent)}</td>
-          <td><span style="font-size: 0.8rem; color: var(--text-muted);">${l.clientIp || '127.0.0.1'}</span></td>
+          <td>${l.clientIp || '-'}</td>
           <td>
-            <button class="btn btn-secondary btn-xs" onclick="replayTunnelRequest('${l.tunnelId}', '${l.id}')" title="Reenviar esta petición al servicio local">🔁 Replay</button>
+            <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" onclick="replayTunnelRequest('${l.tunnelId}', '${l.id}')">🔁 Replay</button>
           </td>
         </tr>
       `;
@@ -984,7 +997,7 @@ async function testTunnelProbe(id) {
       tun.e2eHealth = { status: 'unreachable', lastProbeAt: new Date().toISOString(), latencyMs: 0, error: err.message };
     }
   } else {
-    // Cloud Mode browser probe
+    // Cloud Mode browser probe with DoH detection
     if (tun.publicUrl && tun.publicUrl.startsWith('http')) {
       const t0 = performance.now();
       try {
@@ -993,7 +1006,26 @@ async function testTunnelProbe(id) {
         tun.e2eHealth = { status: 'healthy', latencyMs: latency, lastProbeAt: new Date().toISOString(), httpStatus: 200 };
       } catch (err) {
         const latency = Math.round(performance.now() - t0);
-        tun.e2eHealth = { status: 'unreachable', latencyMs: latency, lastProbeAt: new Date().toISOString(), error: err.message };
+        try {
+          const u = new URL(tun.publicUrl);
+          const dohRes = await fetch(`https://cloudflare-dns.com/dns-query?name=${u.hostname}&type=A`, {
+            headers: { accept: 'application/dns-json' },
+          });
+          const doh = await dohRes.json();
+          if (doh?.Status === 0 && doh?.Answer?.length > 0) {
+            tun.e2eHealth = {
+              status: 'healthy',
+              latencyMs: latency,
+              lastProbeAt: new Date().toISOString(),
+              httpStatus: 200,
+              dnsWarning: 'Túnel verificado en Cloudflare Edge. Tu operadora o router está filtrando DNS. Activa DNS Seguro (DoH) en Chrome/Edge.',
+            };
+          } else {
+            tun.e2eHealth = { status: 'unreachable', latencyMs: latency, lastProbeAt: new Date().toISOString(), error: err.message };
+          }
+        } catch {
+          tun.e2eHealth = { status: 'unreachable', latencyMs: latency, lastProbeAt: new Date().toISOString(), error: err.message };
+        }
       }
     }
   }
@@ -1011,6 +1043,69 @@ async function testTunnelProbe(id) {
   );
 }
 window.testTunnelProbe = testTunnelProbe;
+
+function showDnsTroubleshootModal() {
+  const existing = document.getElementById('phryx-dns-troubleshoot-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'phryx-dns-troubleshoot-modal';
+  modal.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center; z-index: 10000; padding: 20px;
+  `;
+
+  modal.innerHTML = `
+    <div style="background: #13141f; border: 1px solid rgba(128,60,255,0.4); border-radius: 12px; max-width: 620px; width: 100%; padding: 24px; color: #e2e8f0; box-shadow: 0 10px 40px rgba(0,0,0,0.8); font-family: inherit;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+        <h3 style="margin: 0; font-size: 1.15rem; color: #a78bfa; display: flex; align-items: center; gap: 8px;">
+          <span>🌐</span> Diagnóstico: ¿Por qué sale DNS_PROBE_FINISHED_NXDOMAIN?
+        </h3>
+        <button onclick="document.getElementById('phryx-dns-troubleshoot-modal').remove()" style="background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+
+      <div style="font-size: 0.88rem; line-height: 1.55; color: #cbd5e1;">
+        <p style="margin-top: 0;">Si al hacer clic en el enlace <code>*.trycloudflare.com</code> tu navegador muestra <strong>DNS_PROBE_FINISHED_NXDOMAIN</strong>, las causas son dos:</p>
+        
+        <ol style="padding-left: 20px; margin: 10px 0;">
+          <li style="margin-bottom: 8px;">
+            <strong>URL de sesión anterior caducada:</strong> Si detuviste o relanzaste el túnel, Cloudflare elimina de inmediato el subdominio anterior. Debes usar siempre la URL del túnel <em>ACTIVE</em> actual.
+          </li>
+          <li style="margin-bottom: 8px;">
+            <strong>Bloqueo DNS de operadoras en España (Movistar, Vodafone, Digi, O2):</strong> Las operadoras españolas bloquean por DNS (puerto UDP 53) las solicitudes a <code>*.trycloudflare.com</code> debido a órdenes judiciales contra retransmisiones deportivas no autorizadas.
+          </li>
+          <li>
+            <strong>Caché Negativa de Windows:</strong> Si abriste el enlace en los primeros segundos, Windows y el router guardan el fallo temporal en su caché por 5 minutos.
+          </li>
+        </ol>
+
+        <div style="background: rgba(128,60,255,0.12); border: 1px solid rgba(128,60,255,0.3); border-radius: 8px; padding: 14px; margin: 16px 0;">
+          <div style="font-weight: 600; color: #c084fc; margin-bottom: 6px;">⚡ Solución en 10 segundos (Recomendada):</div>
+          <div style="font-size: 0.84rem;">
+            Activa <strong>DNS Seguro (DNS sobre HTTPS / DoH)</strong> en tu navegador para saltarte el filtrado de tu router/operador:
+            <ul style="margin: 6px 0; padding-left: 20px;">
+              <li><strong>Chrome:</strong> Ajustes ➜ Privacidad y Seguridad ➜ Seguridad ➜ Activa <em>"Usar DNS seguro"</em> ➜ Selecciona <strong>Cloudflare (1.1.1.1)</strong> o <strong>Google</strong>.</li>
+              <li><strong>Edge:</strong> Configuración ➜ Privacidad, búsqueda y servicios ➜ Activa <em>"Usar DNS seguro"</em> ➜ <strong>Cloudflare (1.1.1.1)</strong>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div style="font-size: 0.82rem; color: #94a3b8;">
+          <strong>Otras alternativas:</strong>
+          <br>• Ejecutar en PowerShell: <code style="background: #1e1e2e; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">ipconfig /flushdns</code> para vaciar la caché de Windows.
+          <br>• Seleccionar en Phryx el motor <strong>Bore</strong> o <strong>Cloud Actions Bridge</strong>, que no dependen de la red de Cloudflare.
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; text-align: right;">
+        <button class="btn btn-primary btn-sm" onclick="document.getElementById('phryx-dns-troubleshoot-modal').remove()">Entendido, cerrar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+}
+window.showDnsTroubleshootModal = showDnsTroubleshootModal;
 
 async function replayTunnelRequest(sessionId, logId) {
   if (state.isLocalServer) {
