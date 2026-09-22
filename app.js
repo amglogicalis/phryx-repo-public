@@ -2851,13 +2851,15 @@ function initForms() {
 
     showToast('Despachando Cloud Runner en GitHub Actions...', 'info');
     const sessionId = `phryx_tun_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const chosenEngine = (cfg.engine === 'ssh') ? 'ssh' : 'cloudflared';
+    const sub = cfg.subdomain || `tun-${sessionId.slice(-6)}`;
     const session = {
       id: sessionId,
       port: cfg.port,
       protocol: cfg.protocol,
-      engine: 'actions-bridge',
+      engine: chosenEngine,
       mode: 'cloud',
-      publicUrl: `https://${cfg.subdomain || `tun-${sessionId.slice(-6)}`}.ballom.terra.mesh`,
+      publicUrl: chosenEngine === 'ssh' ? `https://${sub}.lhr.life` : `https://${sub}.trycloudflare.com`,
       localUrl: `http://${cfg.targetHost || '127.0.0.1'}:${cfg.port}`,
       startedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + (cfg.timeoutMinutes || 30) * 60 * 1000).toISOString(),
