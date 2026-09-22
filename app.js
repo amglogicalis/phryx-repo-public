@@ -911,7 +911,6 @@ function renderTunnels() {
           </div>
           <div class="session-meta">
             <span><strong>Destino:</strong> ${t.localUrl}</span>
-            <span><strong>Tráfico:</strong> RX ${formatBytes(t.metrics?.rxBytes || 0)} / TX ${formatBytes(t.metrics?.txBytes || 0)}</span>
             <span><strong>Peticiones:</strong> ${t.totalRequests || 0}</span>
             <span><strong>Latencia Media:</strong> ${t.metrics?.avgLatencyMs || 0}ms</span>
             <span><strong>Expira:</strong> ${new Date(t.expiresAt).toLocaleTimeString()}</span>
@@ -946,7 +945,7 @@ function renderTunnels() {
     if (badgeTraffic) badgeTraffic.textContent = `${allLogs.length} peticiones`;
 
     if (allLogs.length === 0) {
-      tbodyLogs.innerHTML = '<tr><td colspan="8" class="text-center text-muted">A la espera de tráfico en los túneles activos...</td></tr>';
+      tbodyLogs.innerHTML = '<tr><td colspan="7" class="text-center text-muted">A la espera de peticiones en los túneles activos...</td></tr>';
     } else {
       tbodyLogs.innerHTML = allLogs
         .slice(0, 30)
@@ -960,7 +959,6 @@ function renderTunnels() {
           <td><code style="font-size: 0.85rem;">${l.path}</code></td>
           <td><span class="${scColor}" style="font-weight: 600;">${l.statusCode}</span></td>
           <td>${l.durationMs}ms</td>
-          <td>${formatBytes(l.bytesReceived)} / ${formatBytes(l.bytesSent)}</td>
           <td>${l.clientIp || '-'}</td>
           <td>
             <button class="btn btn-secondary btn-xs" style="padding: 2px 6px; font-size: 0.72rem;" onclick="replayTunnelRequest('${l.tunnelId}', '${l.id}')">🔁 Replay</button>
