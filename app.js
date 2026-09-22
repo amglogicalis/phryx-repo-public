@@ -719,7 +719,7 @@ async function detectLocalDaemon(isManualRetry = false) {
         banner.style.border = '1px solid var(--success)';
         if (bannerIcon) bannerIcon.textContent = '⚡';
         if (bannerTitle) bannerTitle.textContent = 'Modo Local Activo (Daemon Nativo Conectado :7461)';
-        if (bannerDesc) bannerDesc.innerHTML = 'Conectado al agente local de Phryx. Puedes iniciar túneles reales con Cloudflare (<code>*.trycloudflare.com</code>), Bore TCP o Proxy Local con métricas de red y sondeo E2E.';
+        if (bannerDesc) bannerDesc.innerHTML = 'Conectado al agente local de Phryx. Puedes iniciar túneles reales con Cloudflare (<code>*.trycloudflare.com</code>), OpenSSH Relays (*.lhr.life) o Proxy Local con métricas de red y sondeo E2E.';
       }
       if (badgeMode) {
         badgeMode.textContent = 'Daemon Local :7461 (Activo)';
@@ -780,10 +780,10 @@ function applyTunnelPreset(preset) {
   } else if (preset === 'db') {
     if (inPort) inPort.value = 5432;
     if (inHost) inHost.value = '127.0.0.1';
-    if (inEngine) inEngine.value = 'bore';
+    if (inEngine) inEngine.value = 'ssh';
     if (inProtocol) inProtocol.value = 'tcp';
     if (inCors) inCors.checked = false;
-    if (badgeEngine) badgeEngine.textContent = 'BORE (RAW TCP)';
+    if (badgeEngine) badgeEngine.textContent = 'OPENSSH RELAY (TCP)';
   } else {
     if (badgeEngine) badgeEngine.textContent = (inEngine?.value || 'CUSTOM').toUpperCase();
   }
@@ -1105,7 +1105,7 @@ function showDnsTroubleshootModal() {
         <div style="font-size: 0.82rem; color: #94a3b8;">
           <strong>Otras alternativas:</strong>
           <br>• Ejecutar en PowerShell: <code style="background: #1e1e2e; padding: 2px 6px; border-radius: 4px; color: #38bdf8;">ipconfig /flushdns</code> para vaciar la caché de Windows.
-          <br>• Seleccionar en Phryx el motor <strong>Bore</strong> o <strong>Cloud Actions Bridge</strong>, que no dependen de la red de Cloudflare.
+          <br>• Seleccionar en Phryx el motor <strong>OpenSSH</strong> o <strong>Cloud Actions Bridge</strong>, que no dependen de la red de Cloudflare.
         </div>
       </div>
 

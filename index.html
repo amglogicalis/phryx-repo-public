@@ -223,7 +223,7 @@
         <div class="page-intro">
           <div>
             <h2>PhryxTunnel <span class="badge-local-only" id="tunnel-mode-badge">Multi-Engine Gateway</span></h2>
-            <p>Expón servicios locales a internet de forma efímera con Cloudflare Quick Tunnels, Bore TCP o GitHub Actions Runners ($0 compute).</p>
+            <p>Expón servicios locales a internet de forma efímera con Cloudflare Quick Tunnels, OpenSSH Relays, Proxy Local o GitHub Actions Runners ($0 compute).</p>
           </div>
         </div>
 
@@ -248,7 +248,7 @@
           <span style="font-size: 0.85rem; color: var(--text-muted); align-self: center; margin-right: 4px;">⚡ Perfiles Rápidos:</span>
           <button type="button" class="btn btn-secondary btn-xs preset-btn active" data-preset="vite" onclick="applyTunnelPreset('vite')">🚀 Vite / Next.js (Port 3000 • WS)</button>
           <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="webhook" onclick="applyTunnelPreset('webhook')">📡 Webhook (Port 8080 • Inspector)</button>
-          <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="db" onclick="applyTunnelPreset('db')">🗄️ PostgreSQL / DB (Port 5432 • TCP)</button>
+          <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="db" onclick="applyTunnelPreset('db')">🗄️ PostgreSQL / DB (Port 5432 • OpenSSH)</button>
           <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="custom" onclick="applyTunnelPreset('custom')">⚙️ Personalizado</button>
         </div>
 
@@ -278,8 +278,8 @@
                     <label for="tun-engine">Motor de Ingress</label>
                     <select id="tun-engine" class="form-control">
                       <option value="cloudflared" selected>Cloudflare Quick Tunnel (*.trycloudflare.com)</option>
-                      <option value="bore">Bore TCP Relay (bore.pub)</option>
-                      <option value="local-proxy">Proxy Local & Inspector</option>
+                      <option value="ssh">OpenSSH Nativo - Pinggy / Relay (*.lhr.life / *.pinggy.link)</option>
+                      <option value="local-proxy">Proxy Local & Inspector (127.0.0.1)</option>
                       <option value="actions-bridge">GitHub Actions Cloud Runner</option>
                     </select>
                   </div>
@@ -367,6 +367,7 @@
               <div style="display: flex; align-items: center; gap: 8px;">
                 <h3>Sesiones Activas de Túnel</h3>
                 <span class="pulse-dot"></span>
+              </div>
               <div style="display: flex; gap: 6px; align-items: center;">
                 <button class="btn btn-secondary btn-xs" onclick="purgeInactiveTunnels()" title="Eliminar del panel los túneles que ya no están corriendo">🧹 Purgar Inactivos</button>
                 <button class="btn btn-secondary btn-xs" onclick="loadTunnels(); showToast('Sesiones sincronizadas', 'info')">🔄 Refrescar</button>
@@ -1874,6 +1875,6 @@ SSL: 45ms | TTFB: 110ms</code></pre>
     </main>
   </div>
 
-  <script src="app.js?v=20260922.4"></script>
+  <script src="app.js?v=20260922.5"></script>
 </body>
 </html>
