@@ -862,10 +862,14 @@ function renderTunnels() {
 
   // Tunnel Tab List
   if (sessionContainer) {
-    if (state.tunnels.length === 0) {
+    const activeList = state.tunnels.filter((t) => t.status === 'active');
+    const closedList = state.tunnels.filter((t) => t.status !== 'active');
+    const displayList = [...activeList, ...closedList];
+
+    if (displayList.length === 0) {
       sessionContainer.innerHTML = '<div class="empty-state">No hay túneles activos. Configura el formulario para lanzar uno.</div>';
     } else {
-      sessionContainer.innerHTML = state.tunnels
+      sessionContainer.innerHTML = displayList
         .map(
           (t) => {
             const isActive = t.status === 'active';
@@ -900,7 +904,7 @@ function renderTunnels() {
                 : '');
 
             return `
-        <div class="session-card" id="card-${t.id}">
+        <div class="session-card" id="card-${t.id}" style="${isActive ? '' : 'opacity: 0.55; border-style: dashed; filter: grayscale(0.5);'}">
           <div class="session-header">
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               ${engineTag}
@@ -1183,6 +1187,30 @@ async function deleteTunnelRecord(id) {
   showToast(`Registro [${id}] eliminado correctamente`, 'success');
 }
 window.deleteTunnelRecord = deleteTunnelRecord;
+
+async function purgeInactiveTunnels() {
+  showToast('Purgando túneles inactivos...', 'info');
+  if (state.isLocalServer) {
+    try {
+      const res = await fetch(`${state.apiBase}/api/tunnels/purge`, { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        showToast(`✔ ${data.message || 'Túneles inactivos purgados'}`, 'success');
+        await loadTunnels();
+        return;
+      }
+    } catch {}
+  }
+
+  // Cloud Mode or fallback
+  const before = state.tunnels.length;
+  state.tunnels = state.tunnels.filter((t) => t.status === 'active');
+  const removed = before - state.tunnels.length;
+  localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+  renderTunnels();
+  showToast(`✔ Se eliminaron ${removed} túneles inactivos del panel`, 'success');
+}
+window.purgeInactiveTunnels = purgeInactiveTunnels;
 
 // ==================== CaseShell (SSH CA) Section ====================
 async function loadServers() {

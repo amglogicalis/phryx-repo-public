@@ -367,8 +367,10 @@
               <div style="display: flex; align-items: center; gap: 8px;">
                 <h3>Sesiones Activas de Túnel</h3>
                 <span class="pulse-dot"></span>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn btn-secondary btn-xs" onclick="purgeInactiveTunnels()" title="Eliminar del panel los túneles que ya no están corriendo">🧹 Purgar Inactivos</button>
+                <button class="btn btn-secondary btn-xs" onclick="loadTunnels(); showToast('Sesiones sincronizadas', 'info')">🔄 Refrescar</button>
               </div>
-              <button class="btn btn-secondary btn-xs" onclick="loadTunnels(); showToast('Sesiones sincronizadas', 'info')">🔄 Refrescar</button>
             </div>
             <div class="card-body">
               <div id="tunnel-sessions-container" class="sessions-list">
@@ -1872,6 +1874,6 @@ SSL: 45ms | TTFB: 110ms</code></pre>
     </main>
   </div>
 
-  <script src="app.js?v=20260922.3"></script>
+  <script src="app.js?v=20260922.4"></script>
 </body>
 </html>
