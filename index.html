@@ -219,76 +219,125 @@
       <section class="tab-pane" id="pane-tunnel">
         <div class="page-intro">
           <div>
-            <h2>PhryxTunnel <span class="badge-local-only">Local Exclusive</span></h2>
-            <p>Instantly expose your local services to an ephemeral public URL via GitHub Actions runner relays.</p>
+            <h2>PhryxTunnel <span class="badge-local-only" id="tunnel-mode-badge">Multi-Engine Gateway</span></h2>
+            <p>Expón servicios locales a internet de forma efímera con Cloudflare Quick Tunnels, Bore TCP o GitHub Actions Runners ($0 compute).</p>
           </div>
         </div>
 
-        <!-- Local Host Binding Required Banner -->
+        <!-- Dynamic Local Daemon & Cloud Status Banner -->
         <div class="local-only-banner" id="tunnel-local-banner">
-          <div class="banner-icon">💻</div>
+          <div class="banner-icon" id="tunnel-banner-icon">💻</div>
           <div class="banner-content">
-            <h4>Local Host Binding Required</h4>
-            <p>
-              Un túnel local requiere conectarse directamente al loopback (<code>localhost</code>) de tu máquina física. Por restricciones de seguridad del navegador, las páginas estáticas en la nube no pueden interceptar los puertos de tu hardware local.
-              Para activar el reenvío de tráfico en vivo, arranca la consola local con el CLI o lanza el túnel directamente en tu terminal:
+            <h4 id="tunnel-banner-title">Verificando Conexión con Daemon Local...</h4>
+            <p id="tunnel-banner-desc">
+              Comprobando si el agente nativo de Phryx está activo en <code>http://127.0.0.1:7461</code> para control directo de hardware.
             </p>
             <div class="banner-actions">
-              <code>phryx console</code>
-              <span style="font-size: 0.8rem; color: var(--text-muted);">o</span>
-              <code id="banner-cmd-example">phryx tunnel --port 3000</code>
-              <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('phryx tunnel --port 3000'); showToast('Comando CLI copiado al portapapeles', 'success')">📋 Copiar CLI</button>
+              <code id="banner-cmd-example">phryx console</code>
+              <button type="button" class="btn btn-secondary btn-xs" onclick="copySnippetText('phryx console'); showToast('Comando copiado al portapapeles', 'success')">📋 Copiar phryx console</button>
+              <button type="button" class="btn btn-secondary btn-xs" id="btn-recheck-daemon" onclick="detectLocalDaemon(true)">🔄 Reintentar Conexión</button>
             </div>
           </div>
+        </div>
+
+        <!-- Presets Bar -->
+        <div class="tunnel-presets-bar mb-3" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+          <span style="font-size: 0.85rem; color: var(--text-muted); align-self: center; margin-right: 4px;">⚡ Perfiles Rápidos:</span>
+          <button type="button" class="btn btn-secondary btn-xs preset-btn active" data-preset="vite" onclick="applyTunnelPreset('vite')">🚀 Vite / Next.js (Port 3000 • WS)</button>
+          <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="webhook" onclick="applyTunnelPreset('webhook')">📡 Webhook (Port 8080 • Inspector)</button>
+          <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="db" onclick="applyTunnelPreset('db')">🗄️ PostgreSQL / DB (Port 5432 • TCP)</button>
+          <button type="button" class="btn btn-secondary btn-xs preset-btn" data-preset="custom" onclick="applyTunnelPreset('custom')">⚙️ Personalizado</button>
         </div>
 
         <div class="grid-2-cols">
           <!-- Launcher Form -->
           <div class="card">
             <div class="card-header">
-              <h3>Launch Ephemeral Tunnel</h3>
+              <h3>Configurar e Iniciar Túnel</h3>
+              <span class="badge" id="selected-engine-badge" style="background: rgba(128, 60, 255, 0.2); color: var(--primary-light);">CLOUDFLARE</span>
             </div>
             <div class="card-body">
               <form id="tunnel-form" class="form-vertical">
-                <div class="form-group">
-                  <label for="tun-port">Local Target Port</label>
-                  <input type="number" id="tun-port" class="form-control" placeholder="3000" value="3000" required />
-                  <span class="help-text">The localhost port you want to tunnel to the public internet.</span>
+                <div class="form-row">
+                  <div class="form-group flex-2">
+                    <label for="tun-port">Puerto Local Objetivo</label>
+                    <input type="number" id="tun-port" class="form-control" placeholder="3000" value="3000" required />
+                    <span class="help-text">El puerto en tu localhost que deseas exponer públicamente.</span>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="tun-host">Host Local</label>
+                    <input type="text" id="tun-host" class="form-control" value="127.0.0.1" />
+                  </div>
                 </div>
 
                 <div class="form-row">
                   <div class="form-group flex-1">
-                    <label for="tun-protocol">Protocol</label>
+                    <label for="tun-engine">Motor de Ingress</label>
+                    <select id="tun-engine" class="form-control">
+                      <option value="cloudflared" selected>Cloudflare Quick Tunnel (*.trycloudflare.com)</option>
+                      <option value="bore">Bore TCP Relay (bore.pub)</option>
+                      <option value="local-proxy">Proxy Local & Inspector</option>
+                      <option value="actions-bridge">GitHub Actions Cloud Runner</option>
+                    </select>
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="tun-protocol">Protocolo</label>
                     <select id="tun-protocol" class="form-control">
-                      <option value="http">HTTP / REST</option>
+                      <option value="http" selected>HTTP / REST</option>
+                      <option value="websocket">WebSockets / HMR</option>
                       <option value="https">HTTPS</option>
                       <option value="tcp">Raw TCP</option>
                     </select>
                   </div>
+                </div>
+
+                <div class="form-row">
                   <div class="form-group flex-1">
-                    <label for="tun-timeout">Timeout (Minutes)</label>
+                    <label for="tun-timeout">Duración Lease (Minutos)</label>
                     <input type="number" id="tun-timeout" class="form-control" value="30" min="5" max="360" />
+                  </div>
+                  <div class="form-group flex-1">
+                    <label for="tun-subdomain">Subdominio / Alias (Opcional)</label>
+                    <input type="text" id="tun-subdomain" class="form-control" placeholder="app-preview" />
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label for="tun-subdomain">Custom Subdomain / Alias (Optional)</label>
-                  <input type="text" id="tun-subdomain" class="form-control" placeholder="my-preview-app" />
-                  <span class="help-text">Generates https://my-preview-app.ballom.terra.mesh</span>
-                </div>
+                <!-- Advanced Settings Details Accordion -->
+                <details style="margin-top: 12px; margin-bottom: 16px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px 14px;">
+                  <summary style="cursor: pointer; font-weight: 500; font-size: 0.85rem; color: var(--text-secondary);">⚙️ Opciones Avanzadas de Red y Seguridad (CORS, Auth, Headers)</summary>
+                  <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; cursor: pointer;">
+                      <input type="checkbox" id="tun-cors" checked />
+                      <span>Habilitar Cabeceras CORS Globales (<code>Access-Control-Allow-Origin: *</code>)</span>
+                    </label>
 
-                <div class="form-group">
-                  <label for="tun-auth">Auth Token Protection (Optional)</label>
-                  <input type="text" id="tun-auth" class="form-control" placeholder="Leave empty for public access" />
-                  <span class="help-text">Clients must pass this in X-Phryx-Token header.</span>
-                </div>
+                    <div class="form-row">
+                      <div class="form-group flex-1">
+                        <label for="tun-basic-user" style="font-size: 0.8rem;">HTTP Basic Auth: Usuario</label>
+                        <input type="text" id="tun-basic-user" class="form-control" placeholder="admin" style="font-size: 0.85rem;" />
+                      </div>
+                      <div class="form-group flex-1">
+                        <label for="tun-basic-pass" style="font-size: 0.8rem;">HTTP Basic Auth: Contraseña</label>
+                        <input type="password" id="tun-basic-pass" class="form-control" placeholder="secreto" style="font-size: 0.85rem;" />
+                      </div>
+                    </div>
 
-                <div class="form-actions">
-                  <button type="submit" class="btn btn-primary" id="btn-start-tunnel">
-                    🚀 Launch Tunnel
+                    <div class="form-group">
+                      <label for="tun-auth" style="font-size: 0.8rem;">Token de Autenticación Header (<code>X-Phryx-Token</code>)</label>
+                      <input type="text" id="tun-auth" class="form-control" placeholder="Opcional: Dejar vacío para acceso público" style="font-size: 0.85rem;" />
+                    </div>
+                  </div>
+                </details>
+
+                <div class="form-actions" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <button type="submit" class="btn btn-primary" id="btn-start-tunnel" style="flex: 1; min-width: 180px;">
+                    🚀 Iniciar Túnel Real
                   </button>
-                  <button type="button" class="btn btn-secondary" id="btn-copy-tunnel-cli">
-                    📋 Copy CLI Command
+                  <button type="button" class="btn btn-secondary" id="btn-cloud-tunnel" style="flex: 1; min-width: 180px;">
+                    ☁️ Despachar Cloud Runner
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-tunnel-cli" style="width: auto;">
+                    📋 Copiar CLI
                   </button>
                 </div>
               </form>
@@ -297,12 +346,12 @@
               <div class="card-footer-config mt-4" style="padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                   <div>
-                    <span class="label" style="font-weight: 600; color: var(--text-secondary); display: block; font-size: 0.85rem;">⚙️ Default Tunnel Timeout (min)</span>
-                    <span class="help-text" style="font-size: 0.75rem; color: var(--text-muted);">Fallback duration applied to newly generated tunnels</span>
+                    <span class="label" style="font-weight: 600; color: var(--text-secondary); display: block; font-size: 0.85rem;">⚙️ Timeout por Defecto (min)</span>
+                    <span class="help-text" style="font-size: 0.75rem; color: var(--text-muted);">Duración base aplicada a túneles recién generados</span>
                   </div>
                   <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <input type="number" id="set-tun-timeout" class="form-control" value="30" min="5" max="360" style="width: 85px; text-align: center;" />
-                    <button type="button" class="btn btn-secondary btn-sm" id="btn-save-tun-default">Save Default</button>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-save-tun-default">Guardar</button>
                   </div>
                 </div>
               </div>
@@ -311,13 +360,16 @@
 
           <!-- Active Sessions & Live Traffic Inspector -->
           <div class="card">
-            <div class="card-header">
-              <h3>Active Sessions</h3>
-              <span class="pulse-dot"></span>
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h3>Sesiones Activas de Túnel</h3>
+                <span class="pulse-dot"></span>
+              </div>
+              <button class="btn btn-secondary btn-xs" onclick="loadTunnels(); showToast('Sesiones sincronizadas', 'info')">🔄 Refrescar</button>
             </div>
             <div class="card-body">
               <div id="tunnel-sessions-container" class="sessions-list">
-                <div class="empty-state">No tunnel running. Fill the form to launch one.</div>
+                <div class="empty-state">No hay túneles activos. Configura el formulario para lanzar uno.</div>
               </div>
             </div>
           </div>
@@ -325,27 +377,33 @@
 
         <!-- Request Log Inspector -->
         <div class="card mt-4">
-          <div class="card-header">
-            <h3><span class="icon">📡</span> Live Request Inspector</h3>
-            <span class="badge" id="traffic-count-badge">0 requests</span>
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h3><span class="icon">📡</span> Live Request Inspector (Tráfico en Vivo & Replay)</h3>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span class="badge" id="traffic-count-badge">0 peticiones</span>
+              <button class="btn btn-secondary btn-xs" onclick="clearTunnelLogs()">Limpiar Traza</button>
+            </div>
           </div>
           <div class="card-body">
             <div class="table-wrapper">
               <table class="data-table" id="table-tunnel-logs">
                 <thead>
                   <tr>
-                    <th>Time</th>
-                    <th>Method</th>
-                    <th>Path</th>
-                    <th>Status</th>
-                    <th>Latency</th>
-                    <th>Bytes In / Out</th>
-                    <th>Client IP</th>
+                    <th>Hora</th>
+                    <th>Método</th>
+                    <th>Ruta</th>
+                    <th>Estado</th>
+                    <th>Latencia</th>
+                    <th>Tráfico (RX / TX)</th>
+                    <th>IP Cliente</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody id="tbody-tunnel-logs">
                   <tr>
-                    <td colspan="7" class="text-center text-muted">Awaiting traffic on active tunnels...</td>
+                    <td colspan="8" class="text-center text-muted">A la espera de tráfico en los túneles activos...</td>
                   </tr>
                 </tbody>
               </table>

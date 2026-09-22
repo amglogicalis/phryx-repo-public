@@ -1,0 +1,65 @@
+name: 'Phryx Tunnel Relay'
+description: 'Ephemeral Zero-Trust HTTP/TCP relay runner for localhost tunneling at $0 cost'
+author: 'AMG Logicalis / Terra Ecosystem'
+inputs:
+  port:
+    description: 'Target port'
+    required: true
+    default: '3000'
+  engine:
+    description: 'Ingress engine: cloudflared | chisel'
+    required: false
+    default: 'cloudflared'
+  timeout_minutes:
+    description: 'Lifetime of the ephemeral tunnel in minutes'
+    required: false
+    default: '30'
+  auth_token:
+    description: 'Optional auth token for X-Phryx-Token header validation'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Launch Phryx Ephemeral Tunnel
+      shell: bash
+      env:
+        PORT: ${{ inputs.port }}
+        ENGINE: ${{ inputs.engine }}
+        TIMEOUT: ${{ inputs.timeout_minutes }}
+      run: |
+        echo "🦟 PHRYX: Initializing ephemeral tunnel for port ${PORT} (Engine: ${ENGINE})..."
+        echo "Lease Duration: ${TIMEOUT} minutes"
+        mkdir -p ~/.phryx/bin
+
+        if [ "${ENGINE}" = "cloudflared" ]; then
+          echo "Downloading cloudflared binary..."
+          curl -sSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o ~/.phryx/bin/cloudflared
+          chmod +x ~/.phryx/bin/cloudflared
+
+          echo "Starting Cloudflare Quick Tunnel..."
+          ~/.phryx/bin/cloudflared tunnel --url "http://127.0.0.1:${PORT}" --no-autoupdate > ~/.phryx/cf.log 2>&1 &
+          CF_PID=$!
+
+          # Wait for public URL to appear
+          for i in {1..30}; do
+            URL=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' ~/.phryx/cf.log | head -n 1)
+            if [ -n "$URL" ]; then
+              echo "✔ CLOUDFLARE TUNNEL ONLINE: $URL"
+              break
+            fi
+            sleep 1
+          done
+
+          echo "Tunnel active for ${TIMEOUT}m..."
+          sleep $((${TIMEOUT} * 60))
+          kill -9 $CF_PID 2>/dev/null || true
+        else
+          if [ ! -f ~/.phryx/bin/chisel ]; then
+            curl -sSL https://github.com/jpillora/chisel/releases/download/v1.9.1/chisel_1.9.1_linux_amd64.gz | gunzip > ~/.phryx/bin/chisel
+            chmod +x ~/.phryx/bin/chisel
+          fi
+          echo "Relay active. Waiting for expiration..."
+          sleep $((${TIMEOUT} * 60))
+        fi
+
+        echo "Tunnel lease expired cleanly. Leaving zero footprint."

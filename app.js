@@ -541,26 +541,7 @@ async function authenticate(token) {
 }
 
 function checkLocalMode() {
-  const banner = document.getElementById('tunnel-local-banner');
-  const btnStart = document.getElementById('btn-start-tunnel');
-  if (state.isLocalServer) {
-    if (banner) {
-      banner.style.border = '1px solid var(--success)';
-      const icon = banner.querySelector('.banner-icon');
-      if (icon) icon.textContent = '⚡';
-      const h4 = banner.querySelector('h4');
-      if (h4) h4.textContent = 'Modo Local Activo (Daemon Conectado)';
-      const p = banner.querySelector('p');
-      if (p) p.textContent = 'La consola está conectada a tu backend local de Phryx. Puedes iniciar túneles reales hacia cualquier puerto local.';
-    }
-    if (btnStart) {
-      btnStart.innerHTML = '🚀 Iniciar Túnel Real';
-    }
-  } else {
-    if (btnStart) {
-      btnStart.innerHTML = '💻 Ejecutar en Local (Copiar CLI)';
-    }
-  }
+  detectLocalDaemon(false);
 }
 
 // Navigation Handling
@@ -714,6 +695,101 @@ function renderDashboardRegions() {
 }
 
 // ==================== Tunnels Section ====================
+async function detectLocalDaemon(isManualRetry = false) {
+  const banner = document.getElementById('tunnel-local-banner');
+  const bannerTitle = document.getElementById('tunnel-banner-title');
+  const bannerDesc = document.getElementById('tunnel-banner-desc');
+  const bannerIcon = document.getElementById('tunnel-banner-icon');
+  const badgeMode = document.getElementById('tunnel-mode-badge');
+  const btnStart = document.getElementById('btn-start-tunnel');
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch('http://127.0.0.1:7461/api/status', {
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' },
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      state.isLocalServer = true;
+      state.apiBase = 'http://127.0.0.1:7461';
+      if (banner) {
+        banner.style.border = '1px solid var(--success)';
+        if (bannerIcon) bannerIcon.textContent = '⚡';
+        if (bannerTitle) bannerTitle.textContent = 'Modo Local Activo (Daemon Nativo Conectado :7461)';
+        if (bannerDesc) bannerDesc.innerHTML = 'Conectado al agente local de Phryx. Puedes iniciar túneles reales con Cloudflare (<code>*.trycloudflare.com</code>), Bore TCP o Proxy Local con métricas de red y sondeo E2E.';
+      }
+      if (badgeMode) {
+        badgeMode.textContent = 'Daemon Local :7461 (Activo)';
+        badgeMode.className = 'badge text-success';
+      }
+      if (btnStart) btnStart.innerHTML = '🚀 Iniciar Túnel Real';
+      if (isManualRetry) showToast('Daemon local conectado en http://127.0.0.1:7461', 'success');
+      loadTunnels();
+      return true;
+    }
+  } catch (err) {}
+
+  // Fallback: Pure Cloud Mode
+  if (!state.isLocalServer) {
+    if (banner) {
+      banner.style.border = '1px solid rgba(128, 60, 255, 0.4)';
+      if (bannerIcon) bannerIcon.textContent = '☁️';
+      if (bannerTitle) bannerTitle.textContent = 'Consola Web Online (Modo Cloud & Actions Bridge)';
+      if (bannerDesc) bannerDesc.innerHTML = 'Para túneles hacia este equipo físico, arranca en tu terminal <code>phryx console</code> o <code>phryx tunnel --port 3000</code>. O utiliza el botón <strong>Despachar Cloud Runner</strong> para túneles efímeros en Actions.';
+    }
+    if (badgeMode) {
+      badgeMode.textContent = 'Modo Cloud (Actions Bridge)';
+      badgeMode.className = 'badge text-muted';
+    }
+    if (btnStart) btnStart.innerHTML = '💻 Ejecutar en Local (Copiar CLI)';
+    if (isManualRetry) showToast('No se detectó daemon local en :7461. Operando en modo cloud.', 'info');
+  }
+  return false;
+}
+window.detectLocalDaemon = detectLocalDaemon;
+
+function applyTunnelPreset(preset) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  const activeBtn = document.querySelector(`.preset-btn[data-preset="${preset}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  const inPort = document.getElementById('tun-port');
+  const inEngine = document.getElementById('tun-engine');
+  const inProtocol = document.getElementById('tun-protocol');
+  const inCors = document.getElementById('tun-cors');
+  const inHost = document.getElementById('tun-host');
+  const badgeEngine = document.getElementById('selected-engine-badge');
+
+  if (preset === 'vite') {
+    if (inPort) inPort.value = 3000;
+    if (inHost) inHost.value = '127.0.0.1';
+    if (inEngine) inEngine.value = 'cloudflared';
+    if (inProtocol) inProtocol.value = 'websocket';
+    if (inCors) inCors.checked = true;
+    if (badgeEngine) badgeEngine.textContent = 'CLOUDFLARE (HMR)';
+  } else if (preset === 'webhook') {
+    if (inPort) inPort.value = 8080;
+    if (inHost) inHost.value = '127.0.0.1';
+    if (inEngine) inEngine.value = 'cloudflared';
+    if (inProtocol) inProtocol.value = 'http';
+    if (inCors) inCors.checked = true;
+    if (badgeEngine) badgeEngine.textContent = 'CLOUDFLARE (WEBHOOK)';
+  } else if (preset === 'db') {
+    if (inPort) inPort.value = 5432;
+    if (inHost) inHost.value = '127.0.0.1';
+    if (inEngine) inEngine.value = 'bore';
+    if (inProtocol) inProtocol.value = 'tcp';
+    if (inCors) inCors.checked = false;
+    if (badgeEngine) badgeEngine.textContent = 'BORE (RAW TCP)';
+  } else {
+    if (badgeEngine) badgeEngine.textContent = (inEngine?.value || 'CUSTOM').toUpperCase();
+  }
+}
+window.applyTunnelPreset = applyTunnelPreset;
+
 async function loadTunnels() {
   try {
     if (state.isLocalServer) {
@@ -727,7 +803,7 @@ async function loadTunnels() {
   } catch {}
 
   // Fetch from GitHub Vault if online
-  if (state.ghToken) {
+  if (state.ghToken && typeof vaultClient !== 'undefined') {
     const files = await vaultClient.listFolder('tunnel-sessions');
     if (files && files.length > 0) {
       const loaded = [];
@@ -773,7 +849,7 @@ function renderTunnels() {
           </div>
           <div class="session-meta">
             <span>Local: ${t.localUrl}</span>
-            <span>Requests: ${t.totalRequests}</span>
+            <span>Requests: ${t.totalRequests || 0}</span>
             <span>Expires: ${new Date(t.expiresAt).toLocaleTimeString()}</span>
           </div>
         </div>
@@ -786,29 +862,59 @@ function renderTunnels() {
   // Tunnel Tab List
   if (sessionContainer) {
     if (state.tunnels.length === 0) {
-      sessionContainer.innerHTML = '<div class="empty-state">No tunnel running. Fill the form to launch one.</div>';
+      sessionContainer.innerHTML = '<div class="empty-state">No hay túneles activos. Configura el formulario para lanzar uno.</div>';
     } else {
       sessionContainer.innerHTML = state.tunnels
         .map(
           (t) => {
             const isActive = t.status === 'active';
-            const badgeClass = isActive ? 'text-success' : 'text-muted';
+            let healthBadge = '';
+            if (isActive) {
+              if (t.e2eHealth?.status === 'healthy') {
+                healthBadge = `<span class="badge badge-healthy">● ONLINE (${t.e2eHealth.latencyMs}ms)</span>`;
+              } else if (t.e2eHealth?.status === 'unreachable') {
+                healthBadge = `<span class="badge badge-unreachable" title="${t.e2eHealth.error || ''}">✖ UNREACHABLE</span>`;
+              } else if (t.e2eHealth?.status === 'probing') {
+                healthBadge = `<span class="badge badge-probing">○ PROBING...</span>`;
+              } else {
+                healthBadge = `<span class="badge text-success">ACTIVE</span>`;
+              }
+            } else {
+              healthBadge = `<span class="badge text-muted">CLOSED</span>`;
+            }
+
+            const engineTag = `<span class="session-engine-tag">${(t.engine || 'CLOUDFLARE').toUpperCase()}</span>`;
+            const isHttp = t.publicUrl && t.publicUrl.startsWith('http');
+
             return `
-        <div class="session-card">
+        <div class="session-card" id="card-${t.id}">
           <div class="session-header">
-            <span class="session-url">${t.publicUrl}</span>
-            <span class="badge ${badgeClass}">${t.status.toUpperCase()}</span>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              ${engineTag}
+              <a href="${isHttp ? t.publicUrl : '#'}" target="_blank" rel="noopener noreferrer" class="session-url" style="text-decoration: none;">
+                ${t.publicUrl || 'Generating endpoint...'} ${isHttp ? '🔗' : ''}
+              </a>
+            </div>
+            ${healthBadge}
           </div>
           <div class="session-meta">
-            <span>Forwarding: ${t.localUrl}</span>
-            <span>Total Req: ${t.totalRequests || 0}</span>
-            <span>Latency: ${t.metrics?.avgLatencyMs || 0}ms</span>
+            <span><strong>Destino:</strong> ${t.localUrl}</span>
+            <span><strong>Tráfico:</strong> RX ${formatBytes(t.metrics?.rxBytes || 0)} / TX ${formatBytes(t.metrics?.txBytes || 0)}</span>
+            <span><strong>Peticiones:</strong> ${t.totalRequests || 0}</span>
+            <span><strong>Latencia Media:</strong> ${t.metrics?.avgLatencyMs || 0}ms</span>
+            <span><strong>Expira:</strong> ${new Date(t.expiresAt).toLocaleTimeString()}</span>
           </div>
-          <div class="form-actions mt-4" style="display: flex; gap: 8px; align-items: center; margin-top: 12px;">
-            <button class="btn btn-secondary btn-xs" onclick="copySnippetText('${t.publicUrl}'); showToast('URL copiada al portapapeles', 'success')">📋 Copy URL</button>
+          <div class="form-actions mt-4" style="display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-xs" onclick="copySnippetText('${t.publicUrl}'); showToast('URL pública copiada al portapapeles', 'success')">📋 Copiar URL</button>
+            <button class="btn btn-secondary btn-xs" onclick="testTunnelProbe('${t.id}')">⚡ Probar Conectividad E2E</button>
+            ${
+              isHttp
+                ? `<button class="btn btn-secondary btn-xs" onclick="window.open('${t.publicUrl}', '_blank')">🌐 Abrir</button>`
+                : ''
+            }
             ${
               isActive
-                ? `<button class="btn btn-warning btn-xs" onclick="closeTunnel('${t.id}')">🛑 Stop Tunnel</button>`
+                ? `<button class="btn btn-warning btn-xs" onclick="closeTunnel('${t.id}')">🛑 Detener</button>`
                 : ''
             }
             <button class="btn btn-danger btn-xs" title="Eliminar Registro" onclick="deleteTunnelRecord('${t.id}')">🗑️</button>
@@ -823,41 +929,131 @@ function renderTunnels() {
 
   // Render logs
   if (tbodyLogs) {
-    const allLogs = state.tunnels.flatMap((t) => t.recentLogs || []);
-    if (badgeTraffic) badgeTraffic.textContent = `${allLogs.length} requests`;
+    const allLogs = state.tunnels.flatMap((t) => (t.recentLogs || []).map(l => ({ ...l, tunnelId: t.id })));
+    if (badgeTraffic) badgeTraffic.textContent = `${allLogs.length} peticiones`;
 
     if (allLogs.length === 0) {
-      tbodyLogs.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Awaiting traffic on active tunnels...</td></tr>';
+      tbodyLogs.innerHTML = '<tr><td colspan="8" class="text-center text-muted">A la espera de tráfico en los túneles activos...</td></tr>';
     } else {
       tbodyLogs.innerHTML = allLogs
-        .slice(0, 25)
+        .slice(0, 30)
         .map(
-          (l) => `
+          (l) => {
+            const scColor = l.statusCode < 400 ? 'text-success' : 'text-danger';
+            return `
         <tr>
           <td>${new Date(l.timestamp).toLocaleTimeString()}</td>
           <td><span class="badge">${l.method}</span></td>
-          <td><code>${l.path}</code></td>
-          <td><span class="${l.statusCode < 400 ? 'text-success' : 'text-danger'}">${l.statusCode}</span></td>
+          <td><code style="font-size: 0.85rem;">${l.path}</code></td>
+          <td><span class="${scColor}" style="font-weight: 600;">${l.statusCode}</span></td>
           <td>${l.durationMs}ms</td>
-          <td>${l.bytesReceived}B / ${l.bytesSent}B</td>
-          <td>${l.clientIp || '127.0.0.1'}</td>
+          <td>${formatBytes(l.bytesReceived)} / ${formatBytes(l.bytesSent)}</td>
+          <td><span style="font-size: 0.8rem; color: var(--text-muted);">${l.clientIp || '127.0.0.1'}</span></td>
+          <td>
+            <button class="btn btn-secondary btn-xs" onclick="replayTunnelRequest('${l.tunnelId}', '${l.id}')" title="Reenviar esta petición al servicio local">🔁 Replay</button>
+          </td>
         </tr>
-      `
+      `;
+          }
         )
         .join('');
     }
   }
 }
 
+async function testTunnelProbe(id) {
+  const tun = state.tunnels.find((t) => t.id === id);
+  if (!tun) return;
+
+  tun.e2eHealth = {
+    status: 'probing',
+    lastProbeAt: new Date().toISOString(),
+    latencyMs: 0,
+  };
+  renderTunnels();
+
+  if (state.isLocalServer) {
+    try {
+      const res = await fetch(`${state.apiBase}/api/tunnels/${id}/probe`, { method: 'POST' });
+      if (res.ok) {
+        tun.e2eHealth = await res.json();
+      } else {
+        tun.e2eHealth = { status: 'unreachable', lastProbeAt: new Date().toISOString(), latencyMs: 0, error: 'Probe HTTP Error' };
+      }
+    } catch (err) {
+      tun.e2eHealth = { status: 'unreachable', lastProbeAt: new Date().toISOString(), latencyMs: 0, error: err.message };
+    }
+  } else {
+    // Cloud Mode browser probe
+    if (tun.publicUrl && tun.publicUrl.startsWith('http')) {
+      const t0 = performance.now();
+      try {
+        await fetch(tun.publicUrl, { mode: 'no-cors', cache: 'no-store' });
+        const latency = Math.round(performance.now() - t0);
+        tun.e2eHealth = { status: 'healthy', latencyMs: latency, lastProbeAt: new Date().toISOString(), httpStatus: 200 };
+      } catch (err) {
+        const latency = Math.round(performance.now() - t0);
+        tun.e2eHealth = { status: 'unreachable', latencyMs: latency, lastProbeAt: new Date().toISOString(), error: err.message };
+      }
+    }
+  }
+
+  localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+  if (state.ghToken && typeof vaultClient !== 'undefined') {
+    vaultClient.setFile(`tunnel-sessions/${tun.id}.json`, tun, `phryx(tunnel): update probe health ${tun.id}`).catch(() => {});
+  }
+
+  renderTunnels();
+  const isHealthy = tun.e2eHealth.status === 'healthy';
+  showToast(
+    `Sonda E2E: ${isHealthy ? `ONLINE (${tun.e2eHealth.latencyMs}ms)` : 'NO DISPONIBLE'}`,
+    isHealthy ? 'success' : 'warning'
+  );
+}
+window.testTunnelProbe = testTunnelProbe;
+
+async function replayTunnelRequest(sessionId, logId) {
+  if (state.isLocalServer) {
+    showToast(`Reenviando petición [${logId}] al puerto local...`, 'info');
+    try {
+      const res = await fetch(`${state.apiBase}/api/tunnels/${sessionId}/replay/${logId}`, { method: 'POST' });
+      if (res.ok) {
+        const result = await res.json();
+        showToast(`✔ Petición reejecutada: HTTP ${result.log?.statusCode} (${result.log?.durationMs}ms)`, 'success');
+        await loadTunnels();
+      } else {
+        showToast('Error en la reejecución de la petición', 'error');
+      }
+    } catch (err) {
+      showToast(`Fallo de replay: ${err.message}`, 'error');
+    }
+  } else {
+    showToast('La reejecución directa requiere el daemon local de Phryx.', 'warning');
+  }
+}
+window.replayTunnelRequest = replayTunnelRequest;
+
+function clearTunnelLogs() {
+  state.tunnels.forEach(t => { t.recentLogs = []; });
+  localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+  renderTunnels();
+  showToast('Traza de peticiones vaciada', 'info');
+}
+window.clearTunnelLogs = clearTunnelLogs;
+
 async function closeTunnel(id) {
   if (state.isLocalServer) {
-    await fetch(`${state.apiBase}/api/tunnels/${id}`, { method: 'DELETE' });
+    try { await fetch(`${state.apiBase}/api/tunnels/${id}`, { method: 'DELETE' }); } catch {}
   }
   const tun = state.tunnels.find((t) => t.id === id);
   if (tun) tun.status = 'closed';
   localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+  if (state.ghToken && typeof vaultClient !== 'undefined' && tun) {
+    vaultClient.setFile(`tunnel-sessions/${id}.json`, tun, `phryx(tunnel): close session ${id}`).catch(() => {});
+  }
   renderTunnels();
   refreshStatus();
+  showToast(`Túnel [${id}] detenido limpiamente`, 'info');
 }
 
 async function deleteTunnelRecord(id) {
@@ -2429,64 +2625,162 @@ function initForms() {
     alert(`✔ Default SSH Cert Lifetime updated to ${val} minutes.`);
   });
 
-  // Tunnel Form
+  // Tunnel Form & Presets
   document.getElementById('tun-port')?.addEventListener('input', (e) => {
     const val = e.target.value || '3000';
     const exampleEl = document.getElementById('banner-cmd-example');
     if (exampleEl) exampleEl.textContent = `phryx tunnel --port ${val}`;
   });
 
+  document.getElementById('tun-engine')?.addEventListener('change', (e) => {
+    const badge = document.getElementById('selected-engine-badge');
+    if (badge) badge.textContent = (e.target.value || 'CUSTOM').toUpperCase();
+  });
+
   document.getElementById('tunnel-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const port = Number(document.getElementById('tun-port').value);
-    const protocol = document.getElementById('tun-protocol').value;
-    const timeoutMinutes = Number(document.getElementById('tun-timeout').value);
-    const subdomain = document.getElementById('tun-subdomain').value;
-    const authToken = document.getElementById('tun-auth').value;
+    const port = Number(document.getElementById('tun-port')?.value || 3000);
+    const host = document.getElementById('tun-host')?.value || '127.0.0.1';
+    const engine = document.getElementById('tun-engine')?.value || 'cloudflared';
+    const protocol = document.getElementById('tun-protocol')?.value || 'http';
+    const timeoutMinutes = Number(document.getElementById('tun-timeout')?.value || 30);
+    const subdomain = document.getElementById('tun-subdomain')?.value || '';
+    const corsEnabled = Boolean(document.getElementById('tun-cors')?.checked);
+    const basicUser = document.getElementById('tun-basic-user')?.value?.trim();
+    const basicPass = document.getElementById('tun-basic-pass')?.value?.trim();
+    const authToken = document.getElementById('tun-auth')?.value?.trim();
 
-    if (!state.isLocalServer) {
-      const authFlag = authToken ? ` --auth ${authToken}` : '';
-      const subFlag = subdomain ? ` --subdomain ${subdomain}` : '';
-      const cmd = `phryx tunnel --port ${port} --timeout ${timeoutMinutes}${authFlag}${subFlag}`;
-      copySnippetText(cmd);
-      alert(`⚠️ Función Exclusiva de Entorno Local:
-Los navegadores en la nube pública no pueden interceptar ni reenviar puertos de tu máquina física (localhost:${port}).
+    const basicAuth = (basicUser && basicPass) ? { username: basicUser, password: basicPass } : undefined;
+    const payload = {
+      port,
+      targetHost: host,
+      engine,
+      protocol,
+      timeoutMinutes,
+      subdomain,
+      corsEnabled,
+      basicAuth,
+      authToken: authToken || undefined,
+    };
 
-Para iniciar este túnel en tu equipo:
-1) Ejecuta en tu terminal:
-   ${cmd}
-2) O arranca la consola local con:
-   phryx console
-
-¡El comando ha sido copiado automáticamente al portapapeles!`);
+    if (state.isLocalServer) {
+      showToast(`Iniciando túnel real con motor [${engine.toUpperCase()}]...`, 'info');
+      try {
+        const res = await fetch(`${state.apiBase}/api/tunnels`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const session = await res.json();
+          state.tunnels.unshift(session);
+          localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+          renderTunnels();
+          refreshStatus();
+          showToast(`✔ Túnel activo: ${session.publicUrl}`, 'success');
+          setTimeout(() => testTunnelProbe(session.id), 1200);
+        } else {
+          const err = await res.json().catch(() => ({}));
+          showToast(`Error al iniciar túnel: ${err.error || 'Fallo desconocido'}`, 'error');
+        }
+      } catch (err) {
+        showToast(`Error de red con el daemon local: ${err.message}`, 'error');
+      }
       return;
     }
 
-    const payload = { port, protocol, timeoutMinutes, subdomain, authToken };
+    // Pure Cloud Mode: Provide choice between CLI Copy and Cloud Actions Runner
+    const authFlag = authToken ? ` --auth ${authToken}` : '';
+    const corsFlag = corsEnabled ? ' --cors' : '';
+    const engineFlag = ` --engine ${engine}`;
+    const cmd = `phryx tunnel --port ${port} --timeout ${timeoutMinutes}${engineFlag}${corsFlag}${authFlag}`;
+    copySnippetText(cmd);
 
-    const res = await fetch(`${state.apiBase}/api/tunnels`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+    const actionChoice = await showModal({
+      title: 'Consola Web Online (Modo Cloud)',
+      type: 'info',
+      message: `Para exponer el puerto físico localhost:${port} de tu máquina, ejecuta el comando CLI o despacha un Cloud Runner en GitHub Actions.`,
+      details: `Comando copiado al portapapeles:\n${cmd}\n\n¿Deseas despachar ahora un Cloud Runner en GitHub Actions para este puerto?`,
+      confirmText: '☁️ Despachar en Actions',
+      cancelText: 'Entendido (Usar CLI)'
     });
-    if (res.ok) {
-      const session = await res.json();
-      state.tunnels.unshift(session);
+
+    if (actionChoice) {
+      dispatchCloudTunnelRunner(payload);
+    }
+  });
+
+  // Cloud Actions Runner Dispatcher
+  async function dispatchCloudTunnelRunner(cfg) {
+    if (!state.ghToken) {
+      showToast('Se requiere conectar el GitHub PAT para despachar Cloud Runners', 'warning');
+      switchTab('dashboard');
+      return;
     }
 
+    showToast('Despachando Cloud Runner en GitHub Actions...', 'info');
+    const sessionId = `phryx_tun_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const session = {
+      id: sessionId,
+      port: cfg.port,
+      protocol: cfg.protocol,
+      engine: 'actions-bridge',
+      mode: 'cloud',
+      publicUrl: `https://${cfg.subdomain || `tun-${sessionId.slice(-6)}`}.ballom.terra.mesh`,
+      localUrl: `http://${cfg.targetHost || '127.0.0.1'}:${cfg.port}`,
+      startedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + (cfg.timeoutMinutes || 30) * 60 * 1000).toISOString(),
+      status: 'active',
+      authTokenConfigured: Boolean(cfg.authToken),
+      corsEnabled: cfg.corsEnabled,
+      totalRequests: 0,
+      recentLogs: [],
+      e2eHealth: {
+        status: 'probing',
+        lastProbeAt: new Date().toISOString(),
+        latencyMs: 0
+      },
+      metrics: {
+        totalBytes: 0,
+        rxBytes: 0,
+        txBytes: 0,
+        avgLatencyMs: 0,
+        errorCount: 0
+      }
+    };
+
+    state.tunnels.unshift(session);
+    localStorage.setItem('phryx_tunnels', JSON.stringify(state.tunnels));
+    if (typeof vaultClient !== 'undefined') {
+      vaultClient.setFile(`tunnel-sessions/${sessionId}.json`, session, `phryx(tunnel): dispatch cloud session ${sessionId}`).catch(() => {});
+    }
     renderTunnels();
-    refreshStatus();
+    showToast(`✔ Cloud Runner registrado [${sessionId}]. Sincronizando con el Vault.`, 'success');
+  }
+  window.dispatchCloudTunnelRunner = dispatchCloudTunnelRunner;
+
+  document.getElementById('btn-cloud-tunnel')?.addEventListener('click', () => {
+    const port = Number(document.getElementById('tun-port')?.value || 3000);
+    const host = document.getElementById('tun-host')?.value || '127.0.0.1';
+    const engine = document.getElementById('tun-engine')?.value || 'cloudflared';
+    const protocol = document.getElementById('tun-protocol')?.value || 'http';
+    const timeoutMinutes = Number(document.getElementById('tun-timeout')?.value || 30);
+    const subdomain = document.getElementById('tun-subdomain')?.value || '';
+    const corsEnabled = Boolean(document.getElementById('tun-cors')?.checked);
+    dispatchCloudTunnelRunner({ port, targetHost: host, engine, protocol, timeoutMinutes, subdomain, corsEnabled });
   });
 
   // Copy CLI command
   document.getElementById('btn-copy-tunnel-cli')?.addEventListener('click', () => {
-    const port = document.getElementById('tun-port').value;
-    const timeout = document.getElementById('tun-timeout').value;
-    const auth = document.getElementById('tun-auth').value;
+    const port = document.getElementById('tun-port')?.value || '3000';
+    const timeout = document.getElementById('tun-timeout')?.value || '30';
+    const engine = document.getElementById('tun-engine')?.value || 'cloudflared';
+    const auth = document.getElementById('tun-auth')?.value || '';
+    const cors = document.getElementById('tun-cors')?.checked ? ' --cors' : '';
     const authFlag = auth ? ` --auth ${auth}` : '';
-    const cmd = `phryx tunnel --port ${port} --timeout ${timeout}${authFlag}`;
+    const cmd = `phryx tunnel --port ${port} --engine ${engine} --timeout ${timeout}${cors}${authFlag}`;
     copySnippetText(cmd);
-    alert(`Copied to clipboard: ${cmd}`);
+    showToast(`Comando CLI copiado: ${cmd}`, 'success');
   });
 
   // SSH Register / Edit Server Form

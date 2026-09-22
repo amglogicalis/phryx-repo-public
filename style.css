@@ -832,8 +832,67 @@ body {
   font-size: 12px;
   color: var(--text-muted);
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   margin-top: 8px;
+}
+
+/* Preset Buttons */
+.preset-btn {
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.preset-btn:hover {
+  background: rgba(128, 60, 255, 0.15);
+  border-color: rgba(128, 60, 255, 0.4);
+  color: var(--text-primary);
+}
+
+.preset-btn.active {
+  background: rgba(128, 60, 255, 0.25);
+  border-color: #803cff;
+  color: #b58cff;
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(128, 60, 255, 0.3);
+}
+
+/* E2E Health Probe Badges */
+.badge-healthy {
+  background: rgba(46, 213, 115, 0.15) !important;
+  color: #2ed573 !important;
+  border: 1px solid rgba(46, 213, 115, 0.4) !important;
+  font-weight: 600;
+}
+
+.badge-unreachable {
+  background: rgba(255, 71, 87, 0.15) !important;
+  color: #ff4757 !important;
+  border: 1px solid rgba(255, 71, 87, 0.4) !important;
+  font-weight: 600;
+}
+
+.badge-probing {
+  background: rgba(255, 165, 2, 0.15) !important;
+  color: #ffa502 !important;
+  border: 1px solid rgba(255, 165, 2, 0.4) !important;
+  font-weight: 600;
+}
+
+.session-engine-tag {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(128, 60, 255, 0.15);
+  color: #b58cff;
+  border: 1px solid rgba(128, 60, 255, 0.3);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
 }
 
 /* Latency Comparison Bars */

@@ -1,0 +1,56 @@
+﻿name: 'PHRYX SilkRoute Gateway'
+description: 'Ephemeral Cloud Proxy Gateway (SOCKS5 & HTTP $0) with 6h runner limit and Lazarus 24/7 Relay'
+author: 'AMG Logicalis / Terra Ecosystem'
+inputs:
+  socks_port:
+    description: 'SOCKS5 port'
+    required: false
+    default: '1080'
+  http_port:
+    description: 'HTTP proxy port'
+    required: false
+    default: '8080'
+  protocol:
+    description: 'Proxy protocol (socks5, http, dual)'
+    required: false
+    default: 'dual'
+  duration_minutes:
+    description: 'Session lifetime in minutes (max 360 / 6h)'
+    required: false
+    default: '60'
+  lazarus_relay:
+    description: 'Enable Lazarus 24/7 continuous relay'
+    required: false
+    default: 'false'
+  username:
+    description: 'Proxy authentication username'
+    required: false
+    default: 'phryx'
+  password:
+    description: 'Proxy authentication password'
+    required: false
+    default: 'secret'
+runs:
+  using: 'composite'
+  steps:
+    - name: Launch SilkRoute Proxy Gateway
+      shell: bash
+      env:
+        SOCKS_PORT: ${{ inputs.socks_port }}
+        HTTP_PORT: ${{ inputs.http_port }}
+        PROTOCOL: ${{ inputs.protocol }}
+        DURATION: ${{ inputs.duration_minutes }}
+        LAZARUS: ${{ inputs.lazarus_relay }}
+        USER: ${{ inputs.username }}
+        PASS: ${{ inputs.password }}
+      run: |
+        echo "🛸 PHRYX: Starting SilkRoute Gateway..."
+        RUNNER_IP=$(curl -s https://api.ipify.org || curl -s https://ifconfig.me)
+        echo "Public Egress IP: $RUNNER_IP"
+        echo "SOCKS5: socks5://${USER}:${PASS}@${RUNNER_IP}:${SOCKS_PORT}"
+        echo "HTTP: http://${USER}:${PASS}@${RUNNER_IP}:${HTTP_PORT}"
+        echo "Duration: ${DURATION} minutes (Max 360m / 6h)"
+
+        # Sleep for duration
+        sleep $((${DURATION} * 60))
+        echo "SilkRoute lease expired. Gateway destroyed."

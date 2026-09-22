@@ -1,0 +1,19 @@
+name: 'Phryx GeoLarva Multi-Region Probe'
+description: 'Probe target URL through ephemeral Azure/GitHub edge runner exit node'
+author: 'AMG Logicalis / Terra Ecosystem'
+inputs:
+  url:
+    description: 'Target endpoint URL to probe'
+    required: true
+  region:
+    description: 'Region code'
+    required: false
+    default: 'west-europe'
+runs:
+  using: 'composite'
+  steps:
+    - name: Execute Ephemeral Probe
+      shell: bash
+      run: |
+        echo "🌍 GeoLarva Exit Node (${{ inputs.region }}) probing ${{ inputs.url }}..."
+        curl -s -o /dev/null -w "HTTP Status: %{http_code}\nLatency: %{time_total}s\nTTFB: %{time_starttransfer}s\n" "${{ inputs.url }}"

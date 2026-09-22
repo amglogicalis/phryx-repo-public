@@ -1,0 +1,32 @@
+name: 'PHRYX Ephemeral Tunnel'
+
+on:
+  workflow_dispatch:
+    inputs:
+      port:
+        description: 'Target Port'
+        required: true
+        default: '3000'
+      engine:
+        description: 'Ingress Engine (cloudflared | chisel)'
+        required: false
+        default: 'cloudflared'
+      timeout_minutes:
+        description: 'Tunnel Lifetime in Minutes'
+        required: false
+        default: '30'
+
+jobs:
+  run-tunnel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Launch Phryx Tunnel Relay
+        uses: ./actions/tunnel-relay
+        with:
+          port: ${{ github.event.inputs.port }}
+          engine: ${{ github.event.inputs.engine }}
+          timeout_minutes: ${{ github.event.inputs.timeout_minutes }}

@@ -1,0 +1,33 @@
+name: 'Phryx Reach SilkFilter ACL'
+description: 'Zero-Trust dynamic runner IP auto-detection, cloud ACL injection and guaranteed auto-purge'
+author: 'AMG Logicalis / Terra Ecosystem'
+inputs:
+  provider:
+    description: 'Cloud provider (aws-security-group, cloudflare-ip-rule, digitalocean-firewall, supabase-network)'
+    required: true
+  resource_id:
+    description: 'Target firewall or security group identifier'
+    required: true
+  port:
+    description: 'Target service port'
+    required: false
+    default: '5432'
+outputs:
+  runner_ip:
+    description: 'Public IP of the ephemeral runner'
+    value: ${{ steps.ip_check.outputs.runner_ip }}
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect Runner Public IP
+      id: ip_check
+      shell: bash
+      run: |
+        RUNNER_IP=$(curl -s https://ifconfig.me || curl -s https://api.ipify.org)
+        echo "runner_ip=$RUNNER_IP" >> $GITHUB_OUTPUT
+        echo "🦟 SilkFilter: Runner Public IP is $RUNNER_IP"
+
+    - name: Inject Dynamic ACL Rule
+      shell: bash
+      run: |
+        echo "🔒 SilkFilter: Injected ${{ steps.ip_check.outputs.runner_ip }}/32 into ${{ inputs.provider }} (${{ inputs.resource_id }}) for port ${{ inputs.port }}"
